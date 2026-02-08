@@ -23,6 +23,8 @@ import { initAmbience, playDataBlip, playProximityAlert } from './ambience.js';
 import { initPOI, togglePOI } from './poi.js';
 import { VIP_AIRCRAFT } from './vip-registry.js';
 import { initTheater } from './theater.js';
+import { initLandings, toggleLandings, updateLandingsFromAircraft } from './landings.js';
+import { initWarzones, toggleWarzones } from './warzones.js';
 
 const FETCH_INTERVAL = 5000;
 const MAX_AIRCRAFT = 3000; // Cap to prevent browser crash
@@ -35,6 +37,8 @@ let showTrails = true;
 let showGround = true;
 let tcasEnabled = true;
 let tcasSkip = false; // alternate: skip every other fetch cycle
+let showLandings = false;
+let showWarzones = true;
 
 // Hover tooltip
 const tooltipEl = document.getElementById('hover-tooltip');
@@ -351,6 +355,9 @@ async function fetchAndUpdate() {
     // Push to map ONCE per fetch
     pushToMap(allAircraft);
 
+    // Record VIP/private landings (airborne -> on_ground transition)
+    updateLandingsFromAircraft(map, allAircraft);
+
     // Detect anomalies (includes VIP from global scan)
     const anomalies = detectAnomalies(allAircraft);
     const onSelectAnomaly = (ac) => {
@@ -524,6 +531,41 @@ function setupInteraction() {
       hidePanel();
     }
   });
+
+  // Click landing markers for quick context (no panel)
+  map.on('click', 'landings-dots', (e) => {
+    if (!e.features || !e.features.length) return;
+    const p = e.features[0].properties || {};
+    const when = p.landedAt ? new Date(Number(p.landedAt)).toLocaleString() : '';
+    const where = p.nearestIcao ? `${p.nearestIcao}${p.nearestName ? ' · ' + p.nearestName : ''}` : '';
+    const title = p.kind === 'vip' ? (p.label || 'VIP') : (p.registration || 'Private');
+    const lines = [
+      title,
+      p.callsign ? `Callsign: ${p.callsign}` : '',
+      p.aircraft_type ? `Type: ${p.aircraft_type}` : '',
+      where ? `Near: ${where}` : '',
+      when ? `Landed: ${when}` : '',
+    ].filter(Boolean);
+    new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+      .setLngLat(e.lngLat)
+      .setHTML(`<div style="font-family: JetBrains Mono, monospace; font-size: 11px; color: #00ff88;">${lines.map(l => `<div>${String(l).replace(/</g,'&lt;')}</div>`).join('')}</div>`)
+      .addTo(map);
+  });
+
+  map.on('mouseenter', 'landings-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'landings-dots', () => { map.getCanvas().style.cursor = ''; });
+
+  // Click warzones for label
+  map.on('click', 'warzones-fill', (e) => {
+    if (!e.features || !e.features.length) return;
+    const p = e.features[0].properties || {};
+    new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+      .setLngLat(e.lngLat)
+      .setText(p.name || 'Conflict Zone')
+      .addTo(map);
+  });
+  map.on('mouseenter', 'warzones-fill', () => { map.getCanvas().style.cursor = 'help'; });
+  map.on('mouseleave', 'warzones-fill', () => { map.getCanvas().style.cursor = ''; });
 }
 
 function handleFilterDisplayOptions() {
@@ -560,6 +602,22 @@ function handleFilterDisplayOptions() {
   if (poiCheck) {
     poiCheck.addEventListener('change', () => {
       togglePOI(map, poiCheck.checked);
+    });
+  }
+
+  const landingsCheck = document.getElementById('filter-landings');
+  if (landingsCheck) {
+    landingsCheck.addEventListener('change', () => {
+      showLandings = landingsCheck.checked;
+      toggleLandings(map, showLandings);
+    });
+  }
+
+  const warzonesCheck = document.getElementById('filter-warzones');
+  if (warzonesCheck) {
+    warzonesCheck.addEventListener('change', () => {
+      showWarzones = warzonesCheck.checked;
+      toggleWarzones(map, showWarzones);
     });
   }
 }
@@ -641,6 +699,9 @@ async function init() {
     initTerminator(map);
     initRouteArc(map);
     initPOI(map);
+    initWarzones(map);
+    initLandings(map);
+    toggleWarzones(map, showWarzones);
 
     setupInteraction();
     handleFilterDisplayOptions();

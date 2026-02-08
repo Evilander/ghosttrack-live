@@ -177,6 +177,11 @@ const MIL_TRAINERS = new Set([
   'EMB3',                // Super Tucano
 ]);
 
+export function isPrivateJetType(typeDesignator) {
+  if (!typeDesignator) return false;
+  return PRIVATE_JET_TYPES.has(String(typeDesignator).toUpperCase());
+}
+
 /**
  * Classify a military aircraft by sub-type.
  * Returns a short label or null.
@@ -267,7 +272,7 @@ export function detectAnomalies(aircraft) {
     }
 
     // 4. Private / business jet detection
-    if (ac.aircraft_type && PRIVATE_JET_TYPES.has(ac.aircraft_type.toUpperCase())) {
+    if (ac.aircraft_type && isPrivateJetType(ac.aircraft_type)) {
       const typeLabel = ac.aircraft_type.toUpperCase();
       const altInfo = ac.altitude_ft != null ? ` · FL${Math.round(ac.altitude_ft / 100)}` : '';
       anomalies.push({

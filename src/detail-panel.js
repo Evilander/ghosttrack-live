@@ -263,6 +263,31 @@ async function selectAirport(icao) {
       '. Many countries restrict ATC audio broadcasting. Coverage is strongest in the US and select international hubs.</div>';
     els.atcFeedsContainer.appendChild(noFeed);
 
+    // Manual feed entry for international/edge cases
+    const manual = document.createElement('div');
+    manual.className = 'atc-manual';
+    manual.innerHTML =
+      '<div class="atc-manual-title">MANUAL FEED</div>' +
+      '<div class="atc-manual-row">' +
+      '<input class="atc-manual-input" type="text" spellcheck="false" placeholder="e.g. kjfk_twr or egll_app" />' +
+      '<button class="atc-manual-btn">CONNECT</button>' +
+      '</div>' +
+      '<div class="atc-manual-hint">Enter a LiveATC feed name (airport + suffix). This is useful outside common suffix patterns.</div>';
+    const input = manual.querySelector('.atc-manual-input');
+    const btn = manual.querySelector('.atc-manual-btn');
+    btn.addEventListener('click', () => {
+      const v = (input.value || '').trim().toLowerCase();
+      if (!v) return;
+      // Render a single button so the rest of the UI behaves consistently
+      renderFeedButtons([{ feed: v, label: 'MANUAL', desc: v }]);
+      const b = els.atcFeedsContainer.querySelector('.atc-feed-btn');
+      if (b) atcConnect(v, b);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') btn.click();
+    });
+    els.atcFeedsContainer.appendChild(manual);
+
     // "Try anyway" row for power users
     const tryRow = document.createElement('div');
     tryRow.className = 'atc-try-anyway';
