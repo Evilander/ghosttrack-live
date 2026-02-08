@@ -23,6 +23,17 @@ const POI_DATA = [
   { name: 'Davos / St. Gallen', icao: 'LSZR', lat: 47.4853, lon: 9.5608, category: 'vip' },
   { name: 'Farnborough (Private UK)', icao: 'EGLF', lat: 51.2758, lon: -0.7764, category: 'vip' },
   { name: 'Le Bourget (Private Paris)', icao: 'LFPB', lat: 48.9694, lon: 2.4414, category: 'vip' },
+
+  // World landmarks
+  { name: 'Great Pyramids of Giza', icao: '', lat: 29.9792, lon: 31.1342, category: 'landmark' },
+  { name: 'Petra', icao: '', lat: 30.3285, lon: 35.4444, category: 'landmark' },
+  { name: 'Taj Mahal', icao: '', lat: 27.1751, lon: 78.0421, category: 'landmark' },
+  { name: 'Machu Picchu', icao: '', lat: -13.1631, lon: -72.5450, category: 'landmark' },
+  { name: 'Christ the Redeemer', icao: '', lat: -22.9519, lon: -43.2105, category: 'landmark' },
+  { name: 'Eiffel Tower', icao: '', lat: 48.8584, lon: 2.2945, category: 'landmark' },
+  { name: 'Stonehenge', icao: '', lat: 51.1789, lon: -1.8262, category: 'landmark' },
+  { name: 'Mount Everest', icao: '', lat: 27.9881, lon: 86.9250, category: 'landmark' },
+  { name: 'Sydney Opera House', icao: '', lat: -33.8568, lon: 151.2153, category: 'landmark' },
 ];
 
 const CATEGORY_COLORS = {
@@ -30,6 +41,7 @@ const CATEGORY_COLORS = {
   military: '#FFA500',
   celebrity: '#c8a0ff',
   vip: '#FFD700',
+  landmark: '#00ff88',
 };
 
 function toGeoJSON() {
