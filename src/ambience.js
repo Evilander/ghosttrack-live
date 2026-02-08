@@ -95,6 +95,49 @@ export function playDataBlip() {
   osc.stop(audioCtx.currentTime + 0.04);
 }
 
+// --- Emergency alert klaxon (squawk 7500/7600/7700 state change) ---
+let emergencyAlertActive = false;
+
+export function playEmergencyAlert() {
+  if (!audioCtx || !active || emergencyAlertActive) return;
+  emergencyAlertActive = true;
+
+  // Ensure context is running
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const now = audioCtx.currentTime;
+  const emergGain = audioCtx.createGain();
+  emergGain.gain.value = 0.22;
+  emergGain.connect(masterGain);
+
+  // Three descending tones — urgent klaxon pattern (distinct from TCAS)
+  const freqs = [880, 660, 880, 660, 880];
+  const toneLen = 0.18;
+  const gap = 0.06;
+
+  for (let i = 0; i < freqs.length; i++) {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.value = freqs[i];
+
+    const start = now + i * (toneLen + gap);
+    g.gain.setValueAtTime(0.8, start);
+    g.gain.exponentialRampToValueAtTime(0.01, start + toneLen);
+
+    osc.connect(g);
+    g.connect(emergGain);
+    osc.start(start);
+    osc.stop(start + toneLen + 0.01);
+  }
+
+  const totalDuration = freqs.length * (toneLen + gap);
+  emergGain.gain.setValueAtTime(0.22, now + totalDuration);
+  emergGain.gain.exponentialRampToValueAtTime(0.001, now + totalDuration + 0.1);
+
+  setTimeout(() => { emergencyAlertActive = false; }, (totalDuration + 0.3) * 1000);
+}
+
 // --- TCAS proximity alert tone ---
 let alertActive = false;
 let alertOsc1 = null;

@@ -14,14 +14,14 @@ import { initUnits } from './units.js';
 import { initSearch, updateSearchData } from './search.js';
 import { recordPositions, getTrailsGeoJSON } from './trails.js';
 import { updateStates, getInterpolatedPositions } from './interpolate.js';
-import { detectAnomalies, updateAnomalyPanel } from './anomaly.js';
+import { detectAnomalies, updateAnomalyPanel, isPrivateJetType } from './anomaly.js';
 import { initIntercept, isInterceptActive, checkInterceptTarget } from './intercept.js';
 import { initTerminator, toggleTerminator } from './terminator.js';
 import { initRouteArc } from './route-arc.js';
 import { detectProximity, updateTcasPanel, proximityToGeoJSON } from './proximity.js';
-import { initAmbience, playDataBlip, playProximityAlert } from './ambience.js';
+import { initAmbience, playDataBlip, playProximityAlert, playEmergencyAlert } from './ambience.js';
 import { initPOI, togglePOI } from './poi.js';
-import { VIP_AIRCRAFT } from './vip-registry.js';
+import { VIP_AIRCRAFT, getVipInfo } from './vip-registry.js';
 import { initTheater } from './theater.js';
 import { initLandings, toggleLandings, updateLandingsFromAircraft } from './landings.js';
 import { initWarzones, toggleWarzones } from './warzones.js';
@@ -41,10 +41,66 @@ let tcasSkip = false; // alternate: skip every other fetch cycle
 let showLandings = false;
 let showWarzones = true;
 
+// Emergency state tracking — only alert on NEW emergencies
+const knownEmergencies = new Set();
+let emergencyAlertTimer = null;
+
+function showEmergencyBanner(ac, reason) {
+  const el = document.getElementById('emergency-alert');
+  const titleEl = document.getElementById('emergency-alert-title');
+  const detailEl = document.getElementById('emergency-alert-detail');
+  if (!el || !titleEl || !detailEl) return;
+
+  const callsign = ac.callsign || ac.icao24;
+  titleEl.textContent = reason;
+  detailEl.textContent = `${callsign} ${ac.aircraft_type ? '· ' + ac.aircraft_type : ''}`;
+
+  el.classList.remove('hidden');
+  // Force reflow then animate in
+  void el.offsetWidth;
+  el.classList.add('visible');
+
+  // Click banner to fly to aircraft
+  const clickHandler = () => {
+    showPanel(ac);
+    if (ac.longitude != null && ac.latitude != null) {
+      map.flyTo({ center: [ac.longitude, ac.latitude], zoom: Math.max(map.getZoom(), 9), duration: 2000 });
+    }
+    dismissEmergencyBanner();
+    el.removeEventListener('click', clickHandler);
+  };
+  el.onclick = clickHandler;
+
+  const closeBtn = document.getElementById('emergency-alert-close');
+  if (closeBtn) closeBtn.onclick = (e) => { e.stopPropagation(); dismissEmergencyBanner(); };
+
+  // Auto-dismiss after 12 seconds
+  if (emergencyAlertTimer) clearTimeout(emergencyAlertTimer);
+  emergencyAlertTimer = setTimeout(dismissEmergencyBanner, 12000);
+}
+
+function dismissEmergencyBanner() {
+  const el = document.getElementById('emergency-alert');
+  if (!el) return;
+  el.classList.remove('visible');
+  setTimeout(() => el.classList.add('hidden'), 400);
+  if (emergencyAlertTimer) { clearTimeout(emergencyAlertTimer); emergencyAlertTimer = null; }
+}
+
 // Top stats DOM
 const statFastest = document.getElementById('stat-fastest');
-const statClements = document.getElementById('stat-clements');
 const statHighest = document.getElementById('stat-highest');
+const statClements = document.getElementById('stat-clements');
+const statDeepDive = document.getElementById('stat-deepdive');
+const statRocketship = document.getElementById('stat-rocketship');
+const statSlowpoke = document.getElementById('stat-slowpoke');
+const statMilCount = document.getElementById('stat-mil-count');
+const statVipCount = document.getElementById('stat-vip-count');
+const statPvtCount = document.getElementById('stat-pvt-count');
+const statTicker = document.getElementById('stat-ticker');
+
+// Store references for click-to-fly on leaderboard rows
+const leaderboardAircraft = {};
 
 function fmtAircraftLine(ac, extra) {
   const cs = (ac.callsign || ac.icao24 || '').trim();
@@ -56,22 +112,24 @@ function fmtAircraftLine(ac, extra) {
 }
 
 function updateTopFlightStats(aircraft) {
-  if (!statFastest || !statClements || !statHighest) return;
   const list = (aircraft || []).filter((a) => a && !a.isGhost);
   const airborne = list.filter((a) => !a.on_ground);
 
+  // FASTEST
   let fastest = null;
   for (const a of airborne) {
     if (a.speed_kts == null) continue;
     if (!fastest || a.speed_kts > fastest.speed_kts) fastest = a;
   }
 
+  // HIGHEST
   let highest = null;
   for (const a of airborne) {
     if (a.altitude_ft == null) continue;
     if (!highest || a.altitude_ft > highest.altitude_ft) highest = a;
   }
 
+  // TOP MIL (Clements Approved)
   let topMil = null;
   for (const a of airborne) {
     if ((a.dbFlags & 1) === 0) continue;
@@ -79,9 +137,62 @@ function updateTopFlightStats(aircraft) {
     if (!topMil || a.speed_kts > topMil.speed_kts) topMil = a;
   }
 
-  statFastest.textContent = fastest ? fmtAircraftLine(fastest, `${fastest.speed_kts} kts`) : '---';
-  statHighest.textContent = highest ? fmtAircraftLine(highest, `${Math.round(highest.altitude_ft).toLocaleString()} ft`) : '---';
-  statClements.textContent = topMil ? fmtAircraftLine(topMil, `${topMil.speed_kts} kts`) : '---';
+  // DEEP DIVE — fastest descender
+  let deepDive = null;
+  for (const a of airborne) {
+    if (a.vertical_rate_fpm == null || a.vertical_rate_fpm >= 0) continue;
+    if (!deepDive || a.vertical_rate_fpm < deepDive.vertical_rate_fpm) deepDive = a;
+  }
+
+  // ROCKETSHIP — fastest climber
+  let rocketship = null;
+  for (const a of airborne) {
+    if (a.vertical_rate_fpm == null || a.vertical_rate_fpm <= 0) continue;
+    if (!rocketship || a.vertical_rate_fpm > rocketship.vertical_rate_fpm) rocketship = a;
+  }
+
+  // SLOWPOKE — slowest airborne (min 50 kts to exclude glitches)
+  let slowpoke = null;
+  for (const a of airborne) {
+    if (a.speed_kts == null || a.speed_kts < 50) continue;
+    if (!slowpoke || a.speed_kts < slowpoke.speed_kts) slowpoke = a;
+  }
+
+  // Counts
+  let milCount = 0, vipCount = 0, pvtCount = 0;
+  for (const a of list) {
+    if (a.dbFlags & 1) milCount++;
+    if (getVipInfo(a.icao24)) vipCount++;
+    if (a.aircraft_type && isPrivateJetType(a.aircraft_type)) pvtCount++;
+  }
+
+  // Update DOM
+  if (statFastest) statFastest.textContent = fastest ? fmtAircraftLine(fastest, `${fastest.speed_kts} kts`) : '---';
+  if (statHighest) statHighest.textContent = highest ? fmtAircraftLine(highest, `${Math.round(highest.altitude_ft).toLocaleString()} ft`) : '---';
+  if (statClements) statClements.textContent = topMil ? fmtAircraftLine(topMil, `${topMil.speed_kts} kts`) : '---';
+  if (statDeepDive) statDeepDive.textContent = deepDive ? fmtAircraftLine(deepDive, `${Math.round(deepDive.vertical_rate_fpm)} fpm`) : '---';
+  if (statRocketship) statRocketship.textContent = rocketship ? fmtAircraftLine(rocketship, `+${Math.round(rocketship.vertical_rate_fpm)} fpm`) : '---';
+  if (statSlowpoke) statSlowpoke.textContent = slowpoke ? fmtAircraftLine(slowpoke, `${slowpoke.speed_kts} kts`) : '---';
+  if (statMilCount) statMilCount.textContent = String(milCount);
+  if (statVipCount) statVipCount.textContent = String(vipCount);
+  if (statPvtCount) statPvtCount.textContent = String(pvtCount);
+
+  // Store for click-to-fly
+  leaderboardAircraft.fastest = fastest;
+  leaderboardAircraft.highest = highest;
+  leaderboardAircraft.clements = topMil;
+  leaderboardAircraft.deepdive = deepDive;
+  leaderboardAircraft.rocketship = rocketship;
+  leaderboardAircraft.slowpoke = slowpoke;
+
+  // Collapsed ticker — rotate through top stats
+  if (statTicker) {
+    const tickerItems = [];
+    if (fastest) tickerItems.push(`${fastest.callsign || fastest.icao24} ${fastest.speed_kts}kts`);
+    if (highest) tickerItems.push(`${highest.callsign || highest.icao24} FL${Math.round(highest.altitude_ft / 100)}`);
+    if (topMil) tickerItems.push(`MIL: ${topMil.callsign || topMil.icao24}`);
+    statTicker.textContent = tickerItems.length ? tickerItems[Math.floor(Date.now() / 4000) % tickerItems.length] : '';
+  }
 }
 
 // Hover tooltip
@@ -419,6 +530,22 @@ async function fetchAndUpdate() {
     };
     updateAnomalyPanel(anomalies, onSelectAnomaly);
 
+    // Check for NEW emergency squawk activations
+    const currentEmergencies = new Set();
+    for (const a of anomalies) {
+      if (a.type === 'emergency') {
+        currentEmergencies.add(a.aircraft.icao24);
+        if (!knownEmergencies.has(a.aircraft.icao24)) {
+          // New emergency detected — sound the alarm + show banner
+          playEmergencyAlert();
+          showEmergencyBanner(a.aircraft, a.reason);
+        }
+      }
+    }
+    // Update tracking set — clear resolved emergencies
+    knownEmergencies.clear();
+    for (const id of currentEmergencies) knownEmergencies.add(id);
+
     // Ambience data blip on successful fetch
     playDataBlip();
 
@@ -603,16 +730,23 @@ function setupInteraction() {
   map.on('mouseenter', 'landings-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'landings-dots', () => { map.getCanvas().style.cursor = ''; });
 
-  // Click warzones for label
+  // Click warzones for conflict info popup
   map.on('click', 'warzones-fill', (e) => {
     if (!e.features || !e.features.length) return;
     const p = e.features[0].properties || {};
-    new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+    const name = p.name || 'Conflict Zone';
+    const desc = p.desc || '';
+    const html = `<div style="font-family:JetBrains Mono,monospace;max-width:260px;">` +
+      `<div style="font-size:11px;font-weight:700;color:#ff4444;letter-spacing:1.5px;margin-bottom:4px;">` +
+      `&#9888; ${name.replace(/</g,'&lt;')}</div>` +
+      (desc ? `<div style="font-size:10px;color:#E0F0FF;opacity:0.8;line-height:1.5;">${desc.replace(/</g,'&lt;')}</div>` : '') +
+      `</div>`;
+    new maplibregl.Popup({ closeButton: true, closeOnClick: true, className: 'warzone-popup' })
       .setLngLat(e.lngLat)
-      .setText(p.name || 'Conflict Zone')
+      .setHTML(html)
       .addTo(map);
   });
-  map.on('mouseenter', 'warzones-fill', () => { map.getCanvas().style.cursor = 'help'; });
+  map.on('mouseenter', 'warzones-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'warzones-fill', () => { map.getCanvas().style.cursor = ''; });
 }
 
@@ -666,6 +800,14 @@ function handleFilterDisplayOptions() {
     warzonesCheck.addEventListener('change', () => {
       showWarzones = warzonesCheck.checked;
       toggleWarzones(map, showWarzones);
+    });
+  }
+
+  const watchlistCheck = document.getElementById('filter-watchlist');
+  const watchlistPanel = document.getElementById('anomaly-tracker');
+  if (watchlistCheck && watchlistPanel) {
+    watchlistCheck.addEventListener('change', () => {
+      watchlistPanel.style.display = watchlistCheck.checked ? '' : 'none';
     });
   }
 
@@ -739,6 +881,29 @@ function setupCollapsiblePanels() {
       panel.classList.toggle('collapsed');
     });
   });
+
+  // Leaderboard click-to-fly
+  const leaderboardRows = {
+    'stat-row-fastest': 'fastest',
+    'stat-row-highest': 'highest',
+    'stat-row-clements': 'clements',
+    'stat-row-deepdive': 'deepdive',
+    'stat-row-rocketship': 'rocketship',
+    'stat-row-slowpoke': 'slowpoke',
+  };
+  for (const [elId, key] of Object.entries(leaderboardRows)) {
+    const row = document.getElementById(elId);
+    if (row) {
+      row.addEventListener('click', () => {
+        const ac = leaderboardAircraft[key];
+        if (!ac) return;
+        showPanel(ac);
+        if (ac.longitude != null && ac.latitude != null) {
+          map.flyTo({ center: [ac.longitude, ac.latitude], zoom: Math.max(map.getZoom(), 8), duration: 2000 });
+        }
+      });
+    }
+  }
 
   // TCAS on/off toggle
   const tcasCheck = document.getElementById('tcas-enabled');

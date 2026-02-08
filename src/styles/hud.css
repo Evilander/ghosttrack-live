@@ -6,7 +6,7 @@
 /* Altitude Legend */
 #altitude-legend {
   position: fixed;
-  bottom: 16px;
+  bottom: 30px;
   right: 16px;
 }
 .legend-title { font-size: 9px; letter-spacing: 2.5px; opacity: 0.4; margin-bottom: 6px; text-transform: uppercase; }
