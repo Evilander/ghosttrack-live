@@ -1,0 +1,159 @@
+/* ============================================================
+   GhostTrack Live — Radar Sweep & Overlays
+   Animated radar sweep, signal-lost state, and filter panel
+   ============================================================ */
+
+/* --- Radar Sweep Overlay --- */
+
+#radar-sweep {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 200vmax;
+  height: 200vmax;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.04;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 350deg,
+    rgba(0, 255, 136, 0.3) 355deg,
+    transparent 360deg
+  );
+  border-radius: 50%;
+  animation: radar-spin 8s linear infinite;
+}
+
+@keyframes radar-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* ============================================================
+   Signal Lost Overlay
+   ============================================================ */
+
+.signal-lost {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 23, 0.92);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.signal-lost-content {
+  text-align: center;
+}
+
+.signal-lost-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  animation: signal-blink 1.5s infinite;
+}
+
+.signal-lost-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #ff4444;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
+}
+
+.signal-lost-message {
+  font-size: 14px;
+  opacity: 0.6;
+  margin-top: 8px;
+  color: #00ff88;
+}
+
+.signal-lost-retry {
+  font-size: 14px;
+  margin-top: 16px;
+  color: #FFA500;
+  letter-spacing: 1px;
+}
+
+@keyframes signal-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* ============================================================
+   Filter Panel
+   ============================================================ */
+
+.filter-panel {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 15;
+}
+
+.filter-toggle {
+  background: rgba(10, 14, 23, 0.85);
+  border: 1px solid rgba(0, 255, 136, 0.15);
+  color: #00ff88;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.filter-toggle:hover {
+  border-color: rgba(0, 255, 136, 0.35);
+  background: rgba(10, 14, 23, 0.95);
+}
+
+.filter-body {
+  background: rgba(10, 14, 23, 0.9);
+  border: 1px solid rgba(0, 255, 136, 0.15);
+  border-radius: 4px;
+  padding: 12px;
+  margin-top: 6px;
+  min-width: 200px;
+}
+
+.filter-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-bottom: 8px;
+  color: #00ff88;
+}
+
+.filter-check {
+  display: block;
+  font-size: 12px;
+  color: #E0F0FF;
+  margin: 4px 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.filter-check:hover {
+  opacity: 0.8;
+}
+
+.filter-check input {
+  margin-right: 8px;
+  accent-color: #00ff88;
+}
