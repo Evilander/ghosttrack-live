@@ -1,0 +1,549 @@
+/* ============================================================
+   GhostTrack Live — Aircraft Detail Panel
+   Slide-in panel with flight information
+   ============================================================ */
+
+/* --- Panel Container --- */
+
+.detail-panel {
+  position: fixed;
+  top: 0;
+  right: -380px;
+  width: 360px;
+  height: 100%;
+  background: rgba(10, 14, 23, 0.95);
+  border-left: 1px solid rgba(0, 255, 136, 0.2);
+  z-index: 20;
+  transition: right 0.3s ease;
+  padding: 24px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  color: #00ff88;
+  text-shadow:
+    0 0 6px rgba(0, 255, 136, 0.4),
+    0 0 12px rgba(0, 255, 136, 0.15);
+}
+
+.detail-panel:not(.hidden) {
+  right: 0;
+}
+
+/* --- Close Button --- */
+
+.detail-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #00ff88;
+  font-size: 24px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+  padding: 4px;
+  transition: opacity 0.2s ease, text-shadow 0.2s ease;
+}
+
+.detail-close:hover {
+  opacity: 0.7;
+  text-shadow: 0 0 12px rgba(0, 255, 136, 0.6);
+}
+
+/* --- Header --- */
+
+.detail-header {
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(0, 255, 136, 0.15);
+  padding-bottom: 16px;
+}
+
+.detail-callsign {
+  font-size: 28px;
+  font-weight: 700;
+  color: #FFA500;
+  letter-spacing: 2px;
+  display: block;
+  text-shadow:
+    0 0 10px rgba(255, 165, 0, 0.4),
+    0 0 20px rgba(255, 165, 0, 0.15);
+}
+
+.detail-status {
+  font-size: 12px;
+  opacity: 0.6;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* --- Data Grid --- */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.detail-cell {
+  background: rgba(0, 255, 136, 0.03);
+  border: 1px solid rgba(0, 255, 136, 0.08);
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.detail-cell.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-bottom: 4px;
+}
+
+.detail-value {
+  font-size: 18px;
+  font-weight: 500;
+  color: #E0F0FF;
+  text-shadow: none;
+}
+
+.detail-value.highlight {
+  color: #FFA500;
+}
+
+/* --- Trail / History Section --- */
+
+.detail-section-title {
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  opacity: 0.4;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+/* --- Empty State --- */
+
+.detail-empty {
+  font-size: 12px;
+  opacity: 0.4;
+  letter-spacing: 1px;
+  text-align: center;
+  padding: 32px 0;
+}
+
+/* ============================================================
+   Satellite Ground View
+   ============================================================ */
+
+.satellite-view {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 255, 136, 0.1);
+  margin-bottom: 12px;
+}
+#satellite-map {
+  width: 100%;
+  height: 100%;
+}
+.satellite-label {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  font-size: 9px;
+  color: #00ff88;
+  opacity: 0.5;
+  letter-spacing: 1px;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+
+/* ============================================================
+   Action Buttons
+   ============================================================ */
+
+.detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.detail-action-btn {
+  flex: 1;
+  background: rgba(0, 255, 136, 0.06);
+  border: 1px solid rgba(0, 255, 136, 0.2);
+  color: #00ff88;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+.detail-action-btn:hover {
+  background: rgba(0, 255, 136, 0.12);
+  border-color: rgba(0, 255, 136, 0.4);
+}
+.detail-action-btn-alt {
+  border-color: rgba(255, 165, 0, 0.2);
+  color: #FFA500;
+  background: rgba(255, 165, 0, 0.06);
+}
+.detail-action-btn-alt:hover {
+  background: rgba(255, 165, 0, 0.12);
+  border-color: rgba(255, 165, 0, 0.4);
+}
+.detail-action-btn.active {
+  background: rgba(255, 165, 0, 0.15);
+  border-color: #FFA500;
+  color: #FFA500;
+}
+
+/* ============================================================
+   Aircraft Photo
+   ============================================================ */
+
+.detail-photo-container {
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+.detail-photo {
+  width: 100%;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 255, 136, 0.1);
+  display: block;
+}
+.detail-photo-credit {
+  font-size: 9px;
+  opacity: 0.3;
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+}
+
+/* Route display */
+.detail-value.route-value {
+  font-size: 16px;
+  letter-spacing: 2px;
+}
+.route-arrow {
+  color: #00ff88;
+  opacity: 0.5;
+  margin: 0 6px;
+}
+
+/* ============================================================
+   ATC Live Audio Player
+   ============================================================ */
+
+.atc-section {
+  margin-top: 16px;
+  border-top: 1px solid rgba(0, 255, 136, 0.1);
+  padding-top: 4px;
+}
+
+.atc-player {
+  background: rgba(0, 20, 10, 0.5);
+  border: 1px solid rgba(0, 255, 136, 0.12);
+  border-radius: 4px;
+  padding: 12px;
+}
+
+/* Airport tabs (ORIGIN / DEST) */
+.atc-airport-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.atc-airport-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: rgba(0, 255, 136, 0.03);
+  border: 1px solid rgba(0, 255, 136, 0.12);
+  border-radius: 3px;
+  padding: 8px 6px 6px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  color: #00ff88;
+  transition: all 0.2s;
+}
+
+.atc-airport-tab:hover {
+  background: rgba(0, 255, 136, 0.08);
+  border-color: rgba(0, 255, 136, 0.3);
+}
+
+.atc-airport-tab.active {
+  background: rgba(0, 255, 136, 0.1);
+  border-color: #00ff88;
+  box-shadow: 0 0 6px rgba(0, 255, 136, 0.1);
+}
+
+.atc-tab-icao {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.atc-tab-iata {
+  font-size: 9px;
+  opacity: 0.4;
+  letter-spacing: 1px;
+}
+
+.atc-tab-label {
+  font-size: 8px;
+  letter-spacing: 2px;
+  opacity: 0.35;
+  text-transform: uppercase;
+}
+
+/* Feed buttons (TWR, APP, GND, etc.) */
+.atc-feeds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+  min-height: 28px;
+}
+
+.atc-feed-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0, 255, 136, 0.04);
+  border: 1px solid rgba(0, 255, 136, 0.15);
+  border-radius: 3px;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #00ff88;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+
+.atc-feed-btn:hover {
+  background: rgba(0, 255, 136, 0.1);
+  border-color: rgba(0, 255, 136, 0.3);
+}
+
+.atc-feed-btn.active {
+  background: rgba(0, 255, 136, 0.14);
+  border-color: #00ff88;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.15), inset 0 0 8px rgba(0, 255, 136, 0.05);
+}
+
+.atc-feed-btn.error {
+  border-color: rgba(255, 68, 68, 0.3);
+  color: rgba(255, 68, 68, 0.6);
+}
+
+.atc-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(0, 255, 136, 0.3);
+  flex-shrink: 0;
+}
+
+.atc-feed-btn.active .atc-indicator {
+  background: #00ff88;
+  box-shadow: 0 0 6px #00ff88;
+  animation: atc-pulse 1.5s ease-in-out infinite;
+}
+
+.atc-feed-btn.error .atc-indicator {
+  background: rgba(255, 68, 68, 0.5);
+  box-shadow: none;
+  animation: none;
+}
+
+@keyframes atc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.atc-feed-label {
+  font-weight: 600;
+}
+
+.atc-feed-desc {
+  font-size: 8px;
+  opacity: 0.35;
+  letter-spacing: 0.5px;
+}
+
+/* Scanning / no feeds states */
+.atc-scanning {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #00ff88;
+  opacity: 0.6;
+  text-align: center;
+  padding: 8px;
+  animation: atc-blink 1s step-end infinite;
+}
+
+.atc-no-feeds {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: #ff4444;
+  opacity: 0.5;
+  text-align: center;
+  padding: 8px;
+}
+
+.atc-no-coverage {
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.atc-no-coverage-title {
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: #ff4444;
+  margin-bottom: 6px;
+  opacity: 0.8;
+}
+
+.atc-no-coverage-text {
+  font-size: 8.5px;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
+  color: rgba(224, 240, 255, 0.45);
+}
+
+.atc-try-anyway {
+  text-align: center;
+  padding: 6px 0 2px;
+}
+
+.atc-try-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: rgba(0, 255, 136, 0.35);
+  background: transparent;
+  border: 1px solid rgba(0, 255, 136, 0.12);
+  border-radius: 3px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.atc-try-btn:hover {
+  color: rgba(0, 255, 136, 0.7);
+  border-color: rgba(0, 255, 136, 0.3);
+  background: rgba(0, 255, 136, 0.05);
+}
+
+/* Visualizer canvas */
+.atc-visualizer-row {
+  margin: 4px 0;
+}
+
+.atc-visualizer {
+  width: 100%;
+  height: 40px;
+  border-radius: 3px;
+  background: rgba(0, 10, 5, 0.6);
+  border: 1px solid rgba(0, 255, 136, 0.08);
+  display: block;
+}
+
+/* Now playing bar */
+.atc-now-playing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  min-height: 20px;
+}
+
+.atc-status-text {
+  font-size: 9px;
+  letter-spacing: 2px;
+  opacity: 0.5;
+  color: #00ff88;
+}
+
+.atc-status-text.live {
+  opacity: 1;
+  color: #00ff88;
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.4);
+}
+
+.atc-status-text.error {
+  color: #ff4444;
+  opacity: 0.7;
+}
+
+.atc-status-text.connecting {
+  opacity: 0.7;
+  animation: atc-blink 1s step-end infinite;
+}
+
+@keyframes atc-blink {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.2; }
+}
+
+/* Volume */
+.atc-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 255, 136, 0.06);
+}
+
+.atc-vol-icon {
+  font-size: 12px;
+  opacity: 0.4;
+  color: #00ff88;
+}
+
+.atc-volume {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  background: rgba(0, 255, 136, 0.15);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.atc-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  background: #00ff88;
+  border-radius: 50%;
+  border: none;
+  box-shadow: 0 0 4px rgba(0, 255, 136, 0.4);
+  cursor: pointer;
+}
+
+.atc-volume::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: #00ff88;
+  border-radius: 50%;
+  border: none;
+  box-shadow: 0 0 4px rgba(0, 255, 136, 0.4);
+  cursor: pointer;
+}

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GhostTrack Live</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- CRT Scanlines Overlay -->
+  <div id="scanlines"></div>
+
+  <!-- Radar Sweep -->
+  <div id="radar-sweep"></div>
+
+  <!-- HUD Top Left -->
+  <div id="hud-top-left" class="hud">
+    <div class="hud-brand">GHOSTTRACK<span class="hud-brand-dim"> LIVE</span></div>
+    <div class="hud-divider"></div>
+    <div class="hud-row">
+      <span id="heartbeat" class="heartbeat"></span>
+      <span id="aircraft-count">0</span>
+      <span class="hud-label">TRACKED</span>
+    </div>
+    <div class="hud-row hud-row-sub">
+      <span id="airborne-count">0</span>
+      <span class="hud-label">AIRBORNE</span>
+      <span class="hud-sep">|</span>
+      <span id="ground-count">0</span>
+      <span class="hud-label">GROUND</span>
+    </div>
+    <div class="hud-divider"></div>
+    <div class="hud-row hud-row-sub">
+      <span class="hud-label">DATA AGE</span>
+      <span id="data-age">0s</span>
+    </div>
+  </div>
+
+  <!-- HUD Top Right -->
+  <div id="hud-top-right" class="hud">
+    <div class="hud-row">
+      <span class="hud-label">UTC</span>
+      <span id="utc-clock" class="clock-value">00:00:00</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">LOCAL</span>
+      <span id="local-clock" class="clock-value">00:00:00</span>
+    </div>
+    <div class="hud-divider"></div>
+    <div class="hud-row">
+      <span class="hud-label">LAT</span>
+      <span id="cursor-lat" class="clock-value">---.----</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">LON</span>
+      <span id="cursor-lon" class="clock-value">---.----</span>
+    </div>
+  </div>
+
+  <!-- Search Bar -->
+  <div id="search-bar" class="search-bar">
+    <span class="search-icon">⌕</span>
+    <input id="search-input" type="text" placeholder="SEARCH CALLSIGN..." autocomplete="off" spellcheck="false" />
+    <div id="search-results" class="search-results hidden"></div>
+  </div>
+
+  <!-- Unit Toggle -->
+  <div id="unit-toggle" class="hud unit-toggle">
+    <button id="unit-btn" class="unit-btn" title="Toggle units">
+      <span id="unit-label">AVIATION</span>
+      <span class="unit-indicator" id="unit-indicator">KTS / FT</span>
+    </button>
+  </div>
+
+  <!-- Altitude Legend -->
+  <div id="altitude-legend" class="hud">
+    <div class="legend-title">ALTITUDE</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#FFA500"></span><span class="legend-text">0 – 10,000 ft</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:#00CED1"></span><span class="legend-text">10k – 25,000 ft</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:#E0F0FF"></span><span class="legend-text">25,000+ ft</span></div>
+  </div>
+
+  <!-- Top Origins Ticker -->
+  <div id="stats-ticker" class="hud stats-ticker">
+    <div class="legend-title">TOP ORIGINS</div>
+    <div id="top-origins"></div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div id="detail-panel" class="detail-panel hidden">
+    <button id="detail-close" class="detail-close">&times;</button>
+    <div class="detail-header">
+      <span id="detail-callsign" class="detail-callsign">---</span>
+      <span id="detail-status" class="detail-status"></span>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-cell full-width" id="detail-route-cell" style="display:none">
+        <div class="detail-label">ROUTE</div>
+        <div id="detail-route" class="detail-value highlight">---</div>
+      </div>
+      <div class="detail-cell" id="detail-airline-cell" style="display:none">
+        <div class="detail-label">AIRLINE</div>
+        <div id="detail-airline" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell" id="detail-aircraft-cell" style="display:none">
+        <div class="detail-label">AIRCRAFT</div>
+        <div id="detail-aircraft" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">ORIGIN</div>
+        <div id="detail-origin" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">ALTITUDE</div>
+        <div id="detail-altitude" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">GROUND SPEED</div>
+        <div id="detail-speed" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">HEADING</div>
+        <div id="detail-heading" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">VERTICAL RATE</div>
+        <div id="detail-vrate" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">ICAO24</div>
+        <div id="detail-icao" class="detail-value">---</div>
+      </div>
+    </div>
+
+    <!-- Aircraft Photo -->
+    <div id="detail-photo-container" class="detail-photo-container" style="display:none">
+      <div class="detail-section-title">AIRCRAFT PHOTO</div>
+      <img id="detail-photo" class="detail-photo" alt="Aircraft" />
+      <div id="detail-photo-credit" class="detail-photo-credit"></div>
+    </div>
+
+    <!-- Satellite Ground View -->
+    <div class="detail-section-title">GROUND VIEW</div>
+    <div id="satellite-view" class="satellite-view">
+      <div id="satellite-map"></div>
+      <div id="satellite-label" class="satellite-label">Loading terrain...</div>
+    </div>
+    <div class="detail-actions">
+      <button id="btn-google-earth" class="detail-action-btn">OPEN IN GOOGLE EARTH</button>
+      <button id="btn-follow" class="detail-action-btn detail-action-btn-alt">FOLLOW AIRCRAFT</button>
+    </div>
+
+    <!-- ATC Live Audio -->
+    <div id="atc-section" class="atc-section" style="display:none">
+      <div class="detail-section-title">LIVE ATC AUDIO</div>
+      <div class="atc-player">
+        <div id="atc-airport-tabs" class="atc-airport-tabs"></div>
+        <div id="atc-feeds" class="atc-feeds"></div>
+        <div class="atc-visualizer-row">
+          <canvas id="atc-visualizer" class="atc-visualizer" width="312" height="40"></canvas>
+        </div>
+        <div class="atc-now-playing">
+          <span id="atc-status-text" class="atc-status-text">SELECT AIRPORT</span>
+        </div>
+        <div class="atc-volume-row">
+          <span class="atc-vol-icon">&#9835;</span>
+          <input type="range" id="atc-volume" class="atc-volume" min="0" max="100" value="70" />
+        </div>
+        <audio id="atc-audio" preload="none" crossorigin="anonymous"></audio>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hover Tooltip -->
+  <div id="hover-tooltip" class="hover-tooltip hidden">
+    <div id="tooltip-callsign" class="tooltip-callsign"></div>
+    <div id="tooltip-info" class="tooltip-info"></div>
+  </div>
+
+  <!-- Signal Lost Overlay -->
+  <div id="signal-lost" class="signal-lost hidden">
+    <div class="signal-lost-content">
+      <div class="signal-lost-icon">⚠</div>
+      <div class="signal-lost-title">SIGNAL LOST</div>
+      <div id="signal-lost-message" class="signal-lost-message">Connection interrupted</div>
+      <div class="signal-lost-retry">Retrying in <span id="signal-lost-countdown">--</span>s</div>
+    </div>
+  </div>
+
+  <!-- Left-side tracker stack (watchlist + TCAS) -->
+  <div id="tracker-stack" class="tracker-stack">
+    <!-- Anomaly Tracker -->
+    <div id="anomaly-tracker" class="anomaly-tracker hud collapsible">
+      <div class="anomaly-header collapse-header" data-target="anomaly-list">
+        <span class="collapse-arrow">&#9660;</span>
+        <span class="anomaly-title">WATCHLIST</span>
+        <span id="anomaly-count" class="anomaly-count">0</span>
+      </div>
+      <div id="anomaly-list" class="anomaly-list collapse-body"></div>
+    </div>
+
+    <!-- TCAS Proximity Panel -->
+    <div id="tcas-tracker" class="tcas-tracker hud collapsible">
+      <div class="tcas-header collapse-header" data-target="tcas-list">
+        <span class="collapse-arrow">&#9660;</span>
+        <span class="tcas-title">TCAS</span>
+        <span class="tcas-help" data-tooltip="Traffic Collision Avoidance System — detects aircraft pairs that are dangerously close. TA (Traffic Advisory): &lt;5nm &amp; &lt;1000ft separation. RA (Resolution Advisory): &lt;2nm &amp; &lt;500ft separation.">?</span>
+        <label class="tcas-toggle-label" title="Enable/disable TCAS detection"><input type="checkbox" id="tcas-enabled" checked /><span class="tcas-toggle-text">ON</span></label>
+        <span id="tcas-count" class="tcas-count">0</span>
+      </div>
+      <div id="tcas-list" class="tcas-list collapse-body"></div>
+    </div>
+  </div>
+
+  <!-- Theater Mode -->
+  <button id="theater-toggle" class="theater-toggle">THEATER</button>
+
+  <!-- INTERCEPT Game -->
+  <button id="intercept-toggle" class="intercept-toggle">INTERCEPT</button>
+  <div id="intercept-panel" class="intercept-panel hidden">
+    <div id="intercept-mission" class="intercept-mission">STANDBY</div>
+    <div class="intercept-timer-track">
+      <div id="intercept-timer-bar" class="intercept-timer-bar"></div>
+    </div>
+    <div class="intercept-stats">
+      <div class="intercept-stat">
+        <span class="intercept-stat-label">SCORE</span>
+        <span id="intercept-score" class="intercept-score">0</span>
+      </div>
+      <div class="intercept-stat">
+        <span class="intercept-stat-label">STREAK</span>
+        <span id="intercept-streak" class="intercept-streak">×1</span>
+      </div>
+    </div>
+  </div>
+  <div id="intercept-result" class="intercept-result hidden"></div>
+
+  <!-- Filter Panel -->
+  <div id="filter-panel" class="filter-panel">
+    <button id="filter-toggle" class="filter-toggle">▲ FILTERS</button>
+    <div id="filter-body" class="filter-body hidden">
+      <div class="filter-section">
+        <div class="filter-title">ALTITUDE BANDS</div>
+        <label class="filter-check"><input type="checkbox" data-filter="low" checked /><span class="filter-dot" style="background:#FFA500"></span> Ground – 10,000 ft</label>
+        <label class="filter-check"><input type="checkbox" data-filter="mid" checked /><span class="filter-dot" style="background:#00CED1"></span> 10,000 – 25,000 ft</label>
+        <label class="filter-check"><input type="checkbox" data-filter="high" checked /><span class="filter-dot" style="background:#E0F0FF"></span> 25,000+ ft</label>
+      </div>
+      <div class="filter-section">
+        <div class="filter-title">DISPLAY</div>
+        <label class="filter-check"><input type="checkbox" id="filter-ground" checked /> Show ground traffic</label>
+        <label class="filter-check"><input type="checkbox" id="filter-trails" checked /> Show trails</label>
+        <label class="filter-check"><input type="checkbox" id="filter-terminator" checked /> Show day/night</label>
+        <label class="filter-check"><input type="checkbox" id="filter-poi" checked /> Show points of interest</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ambient Soundscape Toggle -->
+  <div id="ambience-controls" class="ambience-controls">
+    <button id="ambience-toggle" class="ambience-toggle" title="Toggle ambient radar soundscape">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+      </svg>
+    </button>
+    <div class="ambience-slider-wrap">
+      <input type="range" id="ambience-volume" class="ambience-volume" min="0" max="100" value="50" />
+    </div>
+  </div>
+
+  <div class="creator-watermark">created by Evilander</div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
