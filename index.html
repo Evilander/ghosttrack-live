@@ -90,6 +90,29 @@
     <div id="top-origins"></div>
   </div>
 
+  <!-- Top Flight Stats -->
+  <div id="top-flight-stats" class="hud collapsible top-flight-stats">
+    <div class="top-flight-header collapse-header" data-target="top-flight-body">
+      <span class="collapse-arrow">&#9660;</span>
+      <span class="top-flight-title">TOP FLIGHT STATS</span>
+    </div>
+    <div id="top-flight-body" class="top-flight-body collapse-body">
+      <div class="top-flight-row">
+        <span class="top-flight-label">FASTEST</span>
+        <span id="stat-fastest" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row">
+        <span class="top-flight-label">CLEMENTS APPROVED CRAFT</span>
+        <span class="tcas-help top-flight-help" data-tooltip="Brandon Clements Approved Craft is the top military craft in the sky right now.">?</span>
+        <span id="stat-clements" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row">
+        <span class="top-flight-label">HIGHEST</span>
+        <span id="stat-highest" class="top-flight-value">---</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Detail Panel -->
   <div id="detail-panel" class="detail-panel hidden">
     <button id="detail-close" class="detail-close">&times;</button>
@@ -257,6 +280,13 @@
         <label class="filter-check"><input type="checkbox" id="filter-poi" checked /> Show points of interest</label>
         <label class="filter-check"><input type="checkbox" id="filter-landings" /> Show VIP/PVT last landings</label>
         <label class="filter-check"><input type="checkbox" id="filter-warzones" checked /> Show warzones</label>
+      </div>
+      <div class="filter-section">
+        <div class="filter-title">CO-OP</div>
+        <label class="filter-check"><input type="checkbox" id="filter-coop" /> Enable co-op (host)</label>
+        <label class="filter-check"><input type="checkbox" id="filter-coop-follow" /> Join as follower</label>
+        <button id="coop-copy-link" class="filter-btn" type="button" disabled>COPY FOLLOW LINK</button>
+        <div id="coop-status" class="filter-hint">OFF</div>
       </div>
     </div>
   </div>

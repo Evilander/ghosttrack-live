@@ -25,6 +25,7 @@ import { VIP_AIRCRAFT } from './vip-registry.js';
 import { initTheater } from './theater.js';
 import { initLandings, toggleLandings, updateLandingsFromAircraft } from './landings.js';
 import { initWarzones, toggleWarzones } from './warzones.js';
+import { initCoop, isCoopEnabled, isCoopHost, getCoopRoom, getShareUrl, enableCoopHost, enableCoopFollow, disableCoop, coopBroadcastSelection } from './coop.js';
 
 const FETCH_INTERVAL = 5000;
 const MAX_AIRCRAFT = 3000; // Cap to prevent browser crash
@@ -39,6 +40,49 @@ let tcasEnabled = true;
 let tcasSkip = false; // alternate: skip every other fetch cycle
 let showLandings = false;
 let showWarzones = true;
+
+// Top stats DOM
+const statFastest = document.getElementById('stat-fastest');
+const statClements = document.getElementById('stat-clements');
+const statHighest = document.getElementById('stat-highest');
+
+function fmtAircraftLine(ac, extra) {
+  const cs = (ac.callsign || ac.icao24 || '').trim();
+  const type = (ac.aircraft_type || '').trim();
+  const bits = [cs];
+  if (type) bits.push(type);
+  if (extra) bits.push(extra);
+  return bits.filter(Boolean).join(' · ');
+}
+
+function updateTopFlightStats(aircraft) {
+  if (!statFastest || !statClements || !statHighest) return;
+  const list = (aircraft || []).filter((a) => a && !a.isGhost);
+  const airborne = list.filter((a) => !a.on_ground);
+
+  let fastest = null;
+  for (const a of airborne) {
+    if (a.speed_kts == null) continue;
+    if (!fastest || a.speed_kts > fastest.speed_kts) fastest = a;
+  }
+
+  let highest = null;
+  for (const a of airborne) {
+    if (a.altitude_ft == null) continue;
+    if (!highest || a.altitude_ft > highest.altitude_ft) highest = a;
+  }
+
+  let topMil = null;
+  for (const a of airborne) {
+    if ((a.dbFlags & 1) === 0) continue;
+    if (a.speed_kts == null) continue;
+    if (!topMil || a.speed_kts > topMil.speed_kts) topMil = a;
+  }
+
+  statFastest.textContent = fastest ? fmtAircraftLine(fastest, `${fastest.speed_kts} kts`) : '---';
+  statHighest.textContent = highest ? fmtAircraftLine(highest, `${Math.round(highest.altitude_ft).toLocaleString()} ft`) : '---';
+  statClements.textContent = topMil ? fmtAircraftLine(topMil, `${topMil.speed_kts} kts`) : '---';
+}
 
 // Hover tooltip
 const tooltipEl = document.getElementById('hover-tooltip');
@@ -358,6 +402,9 @@ async function fetchAndUpdate() {
     // Record VIP/private landings (airborne -> on_ground transition)
     updateLandingsFromAircraft(map, allAircraft);
 
+    // Update top flight stats
+    updateTopFlightStats(allAircraft);
+
     // Detect anomalies (includes VIP from global scan)
     const anomalies = detectAnomalies(allAircraft);
     const onSelectAnomaly = (ac) => {
@@ -479,6 +526,7 @@ function setupInteraction() {
     }
 
     showPanel(aircraft);
+    if (isCoopHost()) coopBroadcastSelection(aircraft.icao24);
   });
 
   // Click on cluster to zoom
@@ -620,6 +668,61 @@ function handleFilterDisplayOptions() {
       toggleWarzones(map, showWarzones);
     });
   }
+
+  // Co-op controls
+  const coopHostCheck = document.getElementById('filter-coop');
+  const coopFollowCheck = document.getElementById('filter-coop-follow');
+  const coopCopyBtn = document.getElementById('coop-copy-link');
+  const coopStatus = document.getElementById('coop-status');
+
+  function refreshCoopUi() {
+    if (!coopHostCheck || !coopFollowCheck || !coopCopyBtn || !coopStatus) return;
+    const on = isCoopEnabled();
+    coopHostCheck.checked = on && isCoopHost();
+    coopFollowCheck.checked = on && !isCoopHost();
+    coopCopyBtn.disabled = !(on && isCoopHost() && getCoopRoom());
+    coopStatus.textContent = !on ? 'OFF' : (isCoopHost() ? `HOST · ROOM ${getCoopRoom()}` : `FOLLOW · ROOM ${getCoopRoom()}`);
+  }
+
+  if (coopHostCheck) {
+    coopHostCheck.addEventListener('change', () => {
+      if (coopHostCheck.checked) {
+        if (coopFollowCheck) coopFollowCheck.checked = false;
+        enableCoopHost();
+      } else {
+        disableCoop();
+      }
+      refreshCoopUi();
+    });
+  }
+
+  if (coopFollowCheck) {
+    coopFollowCheck.addEventListener('change', () => {
+      if (coopFollowCheck.checked) {
+        if (coopHostCheck) coopHostCheck.checked = false;
+        enableCoopFollow();
+      } else {
+        disableCoop();
+      }
+      refreshCoopUi();
+    });
+  }
+
+  if (coopCopyBtn) {
+    coopCopyBtn.addEventListener('click', async () => {
+      const url = getShareUrl();
+      if (!url) return;
+      try {
+        await navigator.clipboard.writeText(url);
+        if (coopStatus) coopStatus.textContent = 'COPIED';
+        setTimeout(refreshCoopUi, 1200);
+      } catch {
+        window.prompt('Copy this link:', url);
+      }
+    });
+  }
+
+  refreshCoopUi();
 }
 
 function setupCollapsiblePanels() {
@@ -659,6 +762,14 @@ async function init() {
 
   initHUD(map);
   initUnits();
+  initCoop((icao24) => {
+    const ac = allAircraft.find((a) => a.icao24 === icao24);
+    if (!ac) return;
+    showPanel(ac);
+    if (ac.longitude != null && ac.latitude != null) {
+      map.flyTo({ center: [ac.longitude, ac.latitude], zoom: Math.max(map.getZoom(), 7), duration: 1200, essential: true });
+    }
+  });
 
   initDetailPanel(
     () => { /* panel closed */ },
@@ -710,6 +821,7 @@ async function init() {
     // Theater mode — cinematic auto-tour
     initTheater(map, () => allAircraft, (ac) => {
       showPanel(ac);
+      if (isCoopHost()) coopBroadcastSelection(ac.icao24);
     });
 
     // Initial fetch

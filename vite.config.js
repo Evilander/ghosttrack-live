@@ -158,8 +158,72 @@ function ochaWarCountriesPlugin() {
   };
 }
 
+function coopPlugin() {
+  const rooms = new Map(); // room -> Set(res)
+  function isValidRoom(room) {
+    return typeof room === 'string' && /^[a-z0-9_-]{4,32}$/i.test(room);
+  }
+  return {
+    name: 'coop-sse',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url.startsWith('/coop/events')) {
+          const u = new URL(req.url, 'http://localhost');
+          const room = u.searchParams.get('room') || '';
+          if (!isValidRoom(room)) {
+            res.statusCode = 400;
+            res.end('Bad room');
+            return;
+          }
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache, no-transform');
+          res.setHeader('Connection', 'keep-alive');
+          res.write('\n');
+          const set = rooms.get(room) || new Set();
+          set.add(res);
+          rooms.set(room, set);
+          const ping = setInterval(() => { try { res.write('event: ping\ndata: {}\n\n'); } catch {} }, 25000);
+          req.on('close', () => {
+            clearInterval(ping);
+            const s = rooms.get(room);
+            if (s) {
+              s.delete(res);
+              if (s.size === 0) rooms.delete(room);
+            }
+          });
+          return;
+        }
+
+        if (req.url.startsWith('/coop/update')) {
+          const u = new URL(req.url, 'http://localhost');
+          const room = u.searchParams.get('room') || '';
+          if (!isValidRoom(room)) {
+            res.statusCode = 400;
+            res.end('Bad room');
+            return;
+          }
+          let body = '';
+          req.on('data', (c) => { body += c; if (body.length > 50_000) req.destroy(); });
+          req.on('end', () => {
+            let msg = {};
+            try { msg = JSON.parse(body || '{}'); } catch {}
+            const payload = JSON.stringify(msg);
+            const s = rooms.get(room);
+            if (s) for (const client of s) { try { client.write(`data: ${payload}\n\n`); } catch {} }
+            res.statusCode = 204;
+            res.end();
+          });
+          return;
+        }
+
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [liveatcFeedsPlugin(), ochaWarCountriesPlugin()],
+  plugins: [liveatcFeedsPlugin(), ochaWarCountriesPlugin(), coopPlugin()],
   server: {
     port: 3000,
     host: true,
