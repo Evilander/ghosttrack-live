@@ -712,18 +712,23 @@ function setupInteraction() {
     if (!e.features || !e.features.length) return;
     const p = e.features[0].properties || {};
     const when = p.landedAt ? new Date(Number(p.landedAt)).toLocaleString() : '';
-    const where = p.nearestIcao ? `${p.nearestIcao}${p.nearestName ? ' · ' + p.nearestName : ''}` : '';
-    const title = p.kind === 'vip' ? (p.label || 'VIP') : (p.registration || 'Private');
-    const lines = [
-      title,
-      p.callsign ? `Callsign: ${p.callsign}` : '',
-      p.aircraft_type ? `Type: ${p.aircraft_type}` : '',
-      where ? `Near: ${where}` : '',
-      when ? `Landed: ${when}` : '',
-    ].filter(Boolean);
-    new maplibregl.Popup({ closeButton: true, closeOnClick: true })
+    const where = p.nearestIcao ? `${p.nearestIcao}${p.nearestName ? ' — ' + p.nearestName : ''}` : '';
+    const isVip = p.kind === 'vip';
+    const titleColor = isVip ? '#FFD700' : '#c8a0ff';
+    const badge = isVip ? 'VIP LANDING' : 'PRIVATE JET LANDING';
+    const owner = isVip ? (p.label || 'VIP') : '';
+    const esc = (s) => String(s).replace(/</g, '&lt;');
+    const html = `<div style="font-family:JetBrains Mono,monospace;max-width:250px;">` +
+      `<div style="font-size:8px;letter-spacing:2px;color:${titleColor};opacity:0.7;margin-bottom:3px;">${badge}</div>` +
+      (owner ? `<div style="font-size:13px;font-weight:700;color:${titleColor};">${esc(owner)}</div>` : '') +
+      (p.callsign ? `<div style="font-size:10px;color:#E0F0FF;opacity:0.8;">Callsign: ${esc(p.callsign)}</div>` : '') +
+      (p.aircraft_type ? `<div style="font-size:10px;color:#E0F0FF;opacity:0.8;">Aircraft: ${esc(p.aircraft_type)}</div>` : '') +
+      (where ? `<div style="font-size:10px;color:#00ff88;margin-top:3px;">${esc(where)}</div>` : '') +
+      (when ? `<div style="font-size:9px;color:#E0F0FF;opacity:0.5;margin-top:2px;">${esc(when)}</div>` : '') +
+      `</div>`;
+    new maplibregl.Popup({ closeButton: true, closeOnClick: true, className: isVip ? 'vip-landing-popup' : '' })
       .setLngLat(e.lngLat)
-      .setHTML(`<div style="font-family: JetBrains Mono, monospace; font-size: 11px; color: #00ff88;">${lines.map(l => `<div>${String(l).replace(/</g,'&lt;')}</div>`).join('')}</div>`)
+      .setHTML(html)
       .addTo(map);
   });
 
