@@ -170,16 +170,26 @@ function endGame() {
 
   // Save high score
   const prev = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
-  if (score > prev) localStorage.setItem(STORAGE_KEY, String(score));
-
-  toggleBtn.classList.remove('active');
-  toggleBtn.textContent = 'INTERCEPT';
-  panel.classList.add('hidden');
-  currentMission = null;
+  const isNewHigh = score > prev;
+  if (isNewHigh) localStorage.setItem(STORAGE_KEY, String(score));
 
   if (timerRaf) { cancelAnimationFrame(timerRaf); timerRaf = null; }
   if (resultTimeout) { clearTimeout(resultTimeout); resultTimeout = null; }
-  resultEl.className = 'intercept-result hidden';
+
+  // Show end-game summary
+  const highScore = Math.max(score, prev);
+  missionEl.innerHTML = `<div style="font-size:11px;letter-spacing:2px;opacity:0.5;margin-bottom:4px;">GAME OVER</div>` +
+    `<div style="font-size:18px;font-weight:700;">SCORE: ${score}</div>` +
+    `<div style="font-size:10px;margin-top:4px;opacity:0.6;">${missionCount} MISSIONS · HIGH SCORE: ${highScore}${isNewHigh ? ' (NEW!)' : ''}</div>`;
+  timerBar.style.width = '0%';
+
+  setTimeout(() => {
+    toggleBtn.classList.remove('active');
+    toggleBtn.textContent = 'INTERCEPT';
+    panel.classList.add('hidden');
+    currentMission = null;
+    resultEl.className = 'intercept-result hidden';
+  }, 3500);
 }
 
 function startMission() {

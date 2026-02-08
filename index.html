@@ -90,25 +90,57 @@
     <div id="top-origins"></div>
   </div>
 
-  <!-- Top Flight Stats -->
-  <div id="top-flight-stats" class="hud collapsible top-flight-stats">
+  <!-- Top Flight Stats (top bar, left of search) -->
+  <div id="top-flight-stats" class="hud collapsible collapsed top-flight-stats">
     <div class="top-flight-header collapse-header" data-target="top-flight-body">
       <span class="collapse-arrow">&#9660;</span>
-      <span class="top-flight-title">TOP FLIGHT STATS</span>
+      <span class="top-flight-title">LEADERBOARD</span>
+      <span id="stat-ticker" class="stat-ticker"></span>
     </div>
     <div id="top-flight-body" class="top-flight-body collapse-body">
-      <div class="top-flight-row">
+      <div class="top-flight-row clickable" id="stat-row-fastest">
+        <span class="top-flight-icon">&#9889;</span>
         <span class="top-flight-label">FASTEST</span>
         <span id="stat-fastest" class="top-flight-value">---</span>
       </div>
-      <div class="top-flight-row">
-        <span class="top-flight-label">CLEMENTS APPROVED CRAFT</span>
-        <span class="tcas-help top-flight-help" data-tooltip="Brandon Clements Approved Craft is the top military craft in the sky right now.">?</span>
-        <span id="stat-clements" class="top-flight-value">---</span>
-      </div>
-      <div class="top-flight-row">
+      <div class="top-flight-row clickable" id="stat-row-highest">
+        <span class="top-flight-icon">&#9650;</span>
         <span class="top-flight-label">HIGHEST</span>
         <span id="stat-highest" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row clickable" id="stat-row-clements">
+        <span class="top-flight-icon">&#9733;</span>
+        <span class="top-flight-label">TOP MIL</span>
+        <span class="tcas-help top-flight-help" data-tooltip="Brandon Clements Approved — fastest military craft in the sky right now.">?</span>
+        <span id="stat-clements" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row clickable" id="stat-row-deepdive">
+        <span class="top-flight-icon">&#9660;</span>
+        <span class="top-flight-label">DEEP DIVE</span>
+        <span id="stat-deepdive" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row clickable" id="stat-row-rocketship">
+        <span class="top-flight-icon">&#9651;</span>
+        <span class="top-flight-label">ROCKETSHIP</span>
+        <span id="stat-rocketship" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row clickable" id="stat-row-slowpoke">
+        <span class="top-flight-icon">&#128034;</span>
+        <span class="top-flight-label">SLOWPOKE</span>
+        <span id="stat-slowpoke" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-divider"></div>
+      <div class="top-flight-row">
+        <span class="top-flight-label">MILITARY</span>
+        <span id="stat-mil-count" class="top-flight-count">0</span>
+      </div>
+      <div class="top-flight-row">
+        <span class="top-flight-label">VIP JETS</span>
+        <span id="stat-vip-count" class="top-flight-count">0</span>
+      </div>
+      <div class="top-flight-row">
+        <span class="top-flight-label">PRIVATE</span>
+        <span id="stat-pvt-count" class="top-flight-count">0</span>
       </div>
     </div>
   </div>
@@ -204,6 +236,16 @@
     <div id="tooltip-info" class="tooltip-info"></div>
   </div>
 
+  <!-- Emergency Alert Banner -->
+  <div id="emergency-alert" class="emergency-alert hidden">
+    <div class="emergency-alert-icon">&#9888;</div>
+    <div class="emergency-alert-body">
+      <div id="emergency-alert-title" class="emergency-alert-title">EMERGENCY</div>
+      <div id="emergency-alert-detail" class="emergency-alert-detail"></div>
+    </div>
+    <button id="emergency-alert-close" class="emergency-alert-close">&times;</button>
+  </div>
+
   <!-- Signal Lost Overlay -->
   <div id="signal-lost" class="signal-lost hidden">
     <div class="signal-lost-content">
@@ -217,7 +259,7 @@
   <!-- Left-side tracker stack (watchlist + TCAS) -->
   <div id="tracker-stack" class="tracker-stack">
     <!-- Anomaly Tracker -->
-    <div id="anomaly-tracker" class="anomaly-tracker hud collapsible">
+    <div id="anomaly-tracker" class="anomaly-tracker hud collapsible collapsed">
       <div class="anomaly-header collapse-header" data-target="anomaly-list">
         <span class="collapse-arrow">&#9660;</span>
         <span class="anomaly-title">WATCHLIST</span>
@@ -239,11 +281,11 @@
     </div>
   </div>
 
-  <!-- Theater Mode -->
-  <button id="theater-toggle" class="theater-toggle">THEATER</button>
-
-  <!-- INTERCEPT Game -->
-  <button id="intercept-toggle" class="intercept-toggle">INTERCEPT</button>
+  <!-- Theater + Intercept Buttons -->
+  <div id="mode-buttons" class="mode-buttons">
+    <button id="theater-toggle" class="theater-toggle">THEATER</button>
+    <button id="intercept-toggle" class="intercept-toggle">INTERCEPT</button>
+  </div>
   <div id="intercept-panel" class="intercept-panel hidden">
     <div id="intercept-mission" class="intercept-mission">STANDBY</div>
     <div class="intercept-timer-track">
@@ -280,6 +322,7 @@
         <label class="filter-check"><input type="checkbox" id="filter-poi" checked /> Show points of interest</label>
         <label class="filter-check"><input type="checkbox" id="filter-landings" /> Show VIP/PVT last landings</label>
         <label class="filter-check"><input type="checkbox" id="filter-warzones" checked /> Show warzones</label>
+        <label class="filter-check"><input type="checkbox" id="filter-watchlist" checked /> Show watchlist panel</label>
       </div>
       <div class="filter-section">
         <div class="filter-title">CO-OP</div>

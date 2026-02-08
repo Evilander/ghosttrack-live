@@ -9,9 +9,9 @@
 
 const FALLBACK_WARZONE_AREAS = [
   {
-    name: 'Conflict Zone (approx): Ukraine',
+    name: 'Ukraine',
     key: 'ukraine',
-    // Rough bounding box polygon
+    desc: 'Russo-Ukrainian War. Full-scale invasion since Feb 2022. Active frontlines across eastern and southern Ukraine. Heavy drone, missile, and artillery warfare. Airspace closed to civil aviation.',
     polygon: [
       [22.0, 52.5],
       [40.5, 52.5],
@@ -21,8 +21,9 @@ const FALLBACK_WARZONE_AREAS = [
     ],
   },
   {
-    name: 'Conflict Zone (approx): Gaza/Israel',
+    name: 'Gaza / Israel',
     key: 'gaza_israel',
+    desc: 'Israel-Hamas conflict. Ongoing military operations in Gaza since Oct 2023. Airstrikes, ground operations, and humanitarian crisis. Ben Gurion and regional airports intermittently disrupted.',
     polygon: [
       [34.0, 32.2],
       [35.9, 32.2],
@@ -32,8 +33,9 @@ const FALLBACK_WARZONE_AREAS = [
     ],
   },
   {
-    name: 'Conflict Zone (approx): Sudan',
+    name: 'Sudan',
     key: 'sudan',
+    desc: 'Sudanese civil war. Conflict between SAF and RSF since Apr 2023. Widespread fighting in Khartoum, Darfur, and Kordofan. Millions displaced. Airports largely non-operational.',
     polygon: [
       [21.5, 22.5],
       [38.5, 22.5],
@@ -43,8 +45,9 @@ const FALLBACK_WARZONE_AREAS = [
     ],
   },
   {
-    name: 'Conflict Zone (approx): Myanmar',
+    name: 'Myanmar',
     key: 'myanmar',
+    desc: 'Myanmar civil war. Armed resistance against military junta since 2021 coup. Multi-front conflict with ethnic armed groups and resistance forces. Airstrikes on civilian areas.',
     polygon: [
       [92.0, 28.6],
       [101.5, 28.6],
@@ -64,6 +67,7 @@ function fallbackGeoJSON() {
       properties: {
         name: a.name,
         key: a.key,
+        desc: a.desc || '',
       },
     })),
   };

@@ -57,11 +57,11 @@ body {
   backdrop-filter: blur(8px);
 }
 
-#hud-top-left { top: 16px; left: 16px; min-width: 180px; }
+#hud-top-left { top: 16px; left: 16px; min-width: 150px; padding: 8px 12px; }
 #hud-top-right { top: 16px; right: 16px; text-align: right; }
 
 .hud-brand {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 3px;
   color: #00ff88;
@@ -82,7 +82,7 @@ body {
 .clock-value { font-size: 15px; font-weight: 500; letter-spacing: 1px; }
 
 #aircraft-count {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   color: #FFA500;
   text-shadow: 0 0 8px rgba(255,165,0,0.5), 0 0 20px rgba(255,165,0,0.2);
@@ -104,7 +104,7 @@ body {
 .search-bar {
   position: fixed;
   top: 16px;
-  left: 50%;
+  left: 53%;
   transform: translateX(-50%);
   z-index: 15;
   display: flex;
@@ -203,7 +203,7 @@ body {
 
 /* Stats Ticker */
 .stats-ticker {
-  bottom: 130px;
+  bottom: 160px;
   right: 16px;
   min-width: 160px;
 }
@@ -217,16 +217,22 @@ body {
 .stats-ticker .origin-name { color: #E0F0FF; opacity: 0.7; }
 
 .top-flight-stats {
-  bottom: 130px;
-  right: 200px;
-  min-width: 280px;
-  max-width: 340px;
+  position: fixed;
+  top: 16px;
+  left: 220px;
+  min-width: 180px;
+  max-width: 280px;
+  z-index: 14;
+  padding: 8px 12px;
 }
 
 .top-flight-header {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+/* Only add bottom margin when expanded */
+.top-flight-stats:not(.collapsed) .top-flight-header {
   margin-bottom: 8px;
 }
 
@@ -238,37 +244,80 @@ body {
   font-weight: 500;
 }
 
+/* Scrolling ticker when collapsed — shows top stat */
+.stat-ticker {
+  font-size: 10px;
+  color: #FFA500;
+  letter-spacing: 0.5px;
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+.top-flight-stats:not(.collapsed) .stat-ticker { display: none; }
+
 .top-flight-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .top-flight-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.top-flight-row.clickable { cursor: pointer; }
+.top-flight-row.clickable:hover { background: rgba(0, 255, 136, 0.08); }
+
+.top-flight-icon {
+  font-size: 11px;
+  opacity: 0.6;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .top-flight-label {
   font-size: 9px;
-  letter-spacing: 1.5px;
+  letter-spacing: 1px;
   opacity: 0.45;
-  min-width: 120px;
+  min-width: 55px;
+  flex-shrink: 0;
 }
 
 .top-flight-value {
-  font-size: 11px;
-  letter-spacing: 1px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
   color: #E0F0FF;
   opacity: 0.85;
   flex: 1;
   text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-flight-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: #FFA500;
+  margin-left: auto;
+}
+
+.top-flight-divider {
+  height: 1px;
+  background: rgba(0, 255, 136, 0.08);
+  margin: 4px 0;
 }
 
 .top-flight-help {
   margin-left: auto;
-  margin-right: 4px;
+  margin-right: 2px;
 }
 
 .hidden { display: none !important; }
@@ -321,7 +370,7 @@ body {
 
 .tracker-stack {
   position: fixed;
-  bottom: 130px;
+  bottom: 70px;
   left: 16px;
   z-index: 10;
   display: flex;
@@ -329,6 +378,8 @@ body {
   gap: 8px;
   min-width: 240px;
   max-width: 300px;
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
 }
 
 /* Collapsible panels */
@@ -383,7 +434,7 @@ body {
   font-weight: 700;
 }
 .anomaly-list {
-  max-height: 280px;
+  max-height: 180px;
   overflow-y: auto;
 }
 .anomaly-item {
@@ -467,12 +518,18 @@ body {
    INTERCEPT Mode — Timed Spotter Challenge
    ============================================================ */
 
-.intercept-toggle {
+/* Theater + Intercept button bar */
+.mode-buttons {
   position: fixed;
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 15;
+  display: flex;
+  gap: 8px;
+}
+
+.intercept-toggle {
   background: rgba(10, 14, 23, 0.85);
   border: 1px solid rgba(255, 165, 0, 0.25);
   border-radius: 4px;
@@ -696,12 +753,12 @@ body {
   position: absolute;
   bottom: calc(100% + 8px);
   left: 0;
-  width: 240px;
+  width: 200px;
   background: rgba(10, 14, 23, 0.95);
   border: 1px solid rgba(255, 68, 68, 0.3);
   border-radius: 4px;
-  padding: 8px 10px;
-  font-size: 10px;
+  padding: 6px 8px;
+  font-size: 9px;
   font-weight: 400;
   letter-spacing: 0.5px;
   line-height: 1.5;
@@ -830,8 +887,8 @@ body {
 
 .ambience-controls {
   position: fixed;
-  bottom: 130px;
-  right: 190px;
+  bottom: 16px;
+  left: 160px;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -923,11 +980,6 @@ body {
    ============================================================ */
 
 .theater-toggle {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(calc(-50% - 90px));
-  z-index: 15;
   background: rgba(10, 14, 23, 0.85);
   border: 1px solid rgba(0, 206, 209, 0.25);
   border-radius: 4px;
@@ -1056,6 +1108,81 @@ body {
   pointer-events: none;
   user-select: none;
 }
+
+/* --- Emergency Alert Banner --- */
+.emergency-alert {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-120%);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(40, 0, 0, 0.92);
+  border: 1px solid rgba(255, 68, 68, 0.6);
+  border-left: 3px solid #ff4444;
+  padding: 10px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 20px rgba(255, 68, 68, 0.3), 0 4px 12px rgba(0, 0, 0, 0.5);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
+  opacity: 0;
+  font-family: 'JetBrains Mono', monospace;
+  max-width: 420px;
+}
+.emergency-alert.visible {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+.emergency-alert.hidden { display: none; }
+.emergency-alert-icon {
+  font-size: 22px;
+  color: #ff4444;
+  animation: emergPulse 0.6s ease-in-out infinite alternate;
+}
+@keyframes emergPulse {
+  from { opacity: 1; text-shadow: 0 0 6px #ff4444; }
+  to { opacity: 0.5; text-shadow: 0 0 16px #ff4444; }
+}
+.emergency-alert-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #ff4444;
+}
+.emergency-alert-detail {
+  font-size: 10px;
+  color: rgba(224, 240, 255, 0.75);
+  letter-spacing: 0.5px;
+  margin-top: 1px;
+}
+.emergency-alert-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.emergency-alert-close:hover { color: #ff4444; }
+
+/* Warzone popup */
+.warzone-popup .maplibregl-popup-content {
+  background: rgba(30, 10, 10, 0.95);
+  border: 1px solid rgba(255, 68, 68, 0.35);
+  border-radius: 4px;
+  padding: 10px 12px;
+  box-shadow: 0 0 12px rgba(255, 68, 68, 0.15);
+}
+.warzone-popup .maplibregl-popup-close-button {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 16px;
+}
+.warzone-popup .maplibregl-popup-close-button:hover { color: #ff4444; }
+.warzone-popup .maplibregl-popup-tip { border-top-color: rgba(30, 10, 10, 0.95); }
 
 /* MapLibre overrides */
 .maplibregl-ctrl-attrib { font-size: 9px !important; opacity: 0.4; }
