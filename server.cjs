@@ -11,8 +11,21 @@ const path = require('path');
 const os = require('os');
 
 const DIST_DIR = path.join(__dirname, 'dist');
-const PORT_START = 3000;
-const PORT_END = 3004;
+const DEFAULT_PORT_START = 3000;
+const DEFAULT_PORT_END = 3004;
+
+function parsePortArg(argv) {
+  const idx = argv.indexOf('--port');
+  if (idx === -1) return null;
+  const raw = argv[idx + 1];
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 65535) return null;
+  return n;
+}
+
+const FIXED_PORT = parsePortArg(process.argv) || (process.env.GHOSTTRACK_PORT ? Number(process.env.GHOSTTRACK_PORT) : null);
+const PORT_START = Number.isInteger(FIXED_PORT) ? FIXED_PORT : DEFAULT_PORT_START;
+const PORT_END = Number.isInteger(FIXED_PORT) ? FIXED_PORT : DEFAULT_PORT_END;
 
 // MIME types for static file serving
 const MIME_TYPES = {
@@ -48,6 +61,13 @@ const PROXY_ROUTES = {
 
 // OCHA API identifiers (required by OCHA-run APIs; request approval from OCHA/ReliefWeb/HDX).
 const OCHA_RELIEFWEB_APPNAME = process.env.OCHA_RELIEFWEB_APPNAME || '';
+
+// Co-op SSE rooms (in-memory)
+const coopRooms = new Map(); // room -> Set(res)
+
+function isValidRoom(room) {
+  return typeof room === 'string' && /^[a-z0-9_-]{4,32}$/i.test(room);
+}
 
 function proxyRequest(clientReq, clientRes, route) {
   const targetPath = clientReq.url.replace(new RegExp('^' + route.prefix), '') || '/';
@@ -260,6 +280,71 @@ function handleRequest(req, res) {
     return;
   }
 
+  // Co-op: SSE events stream
+  if (req.url.startsWith('/coop/events')) {
+    const u = new URL(req.url, 'http://localhost');
+    const room = u.searchParams.get('room') || '';
+    if (!isValidRoom(room)) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      res.end('Bad room');
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.write('\n');
+
+    const set = coopRooms.get(room) || new Set();
+    set.add(res);
+    coopRooms.set(room, set);
+
+    const ping = setInterval(() => {
+      try { res.write('event: ping\ndata: {}\n\n'); } catch {}
+    }, 25000);
+
+    req.on('close', () => {
+      clearInterval(ping);
+      const s = coopRooms.get(room);
+      if (s) {
+        s.delete(res);
+        if (s.size === 0) coopRooms.delete(room);
+      }
+    });
+    return;
+  }
+
+  // Co-op: POST update (broadcast)
+  if (req.url.startsWith('/coop/update')) {
+    const u = new URL(req.url, 'http://localhost');
+    const room = u.searchParams.get('room') || '';
+    if (!isValidRoom(room)) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      res.end('Bad room');
+      return;
+    }
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 50_000) req.destroy(); });
+    req.on('end', () => {
+      let msg = null;
+      try { msg = JSON.parse(body || '{}'); } catch {}
+      if (!msg || typeof msg !== 'object') msg = {};
+      const payload = JSON.stringify(msg);
+      const s = coopRooms.get(room);
+      if (s) {
+        for (const client of s) {
+          try { client.write(`data: ${payload}\n\n`); } catch {}
+        }
+      }
+      res.writeHead(204, { 'Access-Control-Allow-Origin': '*' });
+      res.end();
+    });
+    return;
+  }
+
   // OCHA war country list (requires approved ReliefWeb appname)
   if (req.url.startsWith('/ocha-war-countries')) {
     if (!OCHA_RELIEFWEB_APPNAME) {
@@ -355,7 +440,11 @@ function getLocalIP() {
 
 function tryListen(port) {
   if (port > PORT_END) {
-    console.error('\n  [ERROR] All ports 3000-3004 are busy. Close other servers and try again.\n');
+    if (Number.isInteger(FIXED_PORT)) {
+      console.error(`\n  [ERROR] Port ${FIXED_PORT} is busy. Close other servers and try again.\n`);
+    } else {
+      console.error(`\n  [ERROR] All ports ${DEFAULT_PORT_START}-${DEFAULT_PORT_END} are busy. Close other servers and try again.\n`);
+    }
     process.exit(1);
   }
 
