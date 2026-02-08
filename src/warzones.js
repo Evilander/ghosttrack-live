@@ -1,8 +1,13 @@
 // Warzones overlay.
-// NOTE: This dataset is intentionally conservative and NOT authoritative.
-// Edit/extend as desired.
+//
+// "Authoritative" mode requires UN/OCHA data access that is currently gated behind
+// an approved app identifier for OCHA APIs (ReliefWeb / HDX HAPI).
+// When not configured/available, this falls back to a small approximate overlay.
+//
+// Country boundaries are sourced from Natural Earth (public domain) and used only
+// to render country-level highlighting when OCHA provides a country list.
 
-const WARZONE_AREAS = [
+const FALLBACK_WARZONE_AREAS = [
   {
     name: 'Conflict Zone (approx): Ukraine',
     key: 'ukraine',
@@ -50,10 +55,10 @@ const WARZONE_AREAS = [
   },
 ];
 
-function toGeoJSON() {
+function fallbackGeoJSON() {
   return {
     type: 'FeatureCollection',
-    features: WARZONE_AREAS.map((a) => ({
+    features: FALLBACK_WARZONE_AREAS.map((a) => ({
       type: 'Feature',
       geometry: { type: 'Polygon', coordinates: [a.polygon] },
       properties: {
@@ -67,7 +72,7 @@ function toGeoJSON() {
 export function initWarzones(map) {
   map.addSource('warzones', {
     type: 'geojson',
-    data: toGeoJSON(),
+    data: fallbackGeoJSON(),
   });
 
   map.addLayer({
@@ -97,6 +102,10 @@ export function initWarzones(map) {
       'text-halo-width': 1.5,
     },
   }, 'trail-lines');
+
+  // Try to replace fallback overlay with OCHA-driven country highlighting.
+  // Non-fatal: failures keep the fallback.
+  refreshWarzones(map);
 }
 
 export function toggleWarzones(map, visible) {
@@ -105,3 +114,50 @@ export function toggleWarzones(map, visible) {
   if (map.getLayer('warzones-labels')) map.setLayoutProperty('warzones-labels', 'visibility', vis);
 }
 
+async function loadWorldCountries() {
+  const res = await fetch('/ne_110m_admin_0_countries.geojson', { cache: 'force-cache' });
+  if (!res.ok) throw new Error('world boundaries unavailable');
+  return await res.json();
+}
+
+async function fetchOchaWarCountries() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch('/ocha-war-countries', { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json || !json.authoritative || !Array.isArray(json.iso3) || json.iso3.length === 0) return null;
+    return json;
+  } catch {
+    clearTimeout(timeout);
+    return null;
+  }
+}
+
+async function refreshWarzones(map) {
+  const info = await fetchOchaWarCountries();
+  if (!info) return;
+
+  const world = await loadWorldCountries();
+  const set = new Set(info.iso3.map((s) => String(s).toUpperCase()));
+
+  const features = (world.features || []).filter((f) => {
+    const p = f && f.properties ? f.properties : {};
+    const iso3 = (p.ISO_A3 || p.ADM0_A3 || '').toUpperCase();
+    return iso3 && set.has(iso3);
+  }).map((f) => ({
+    type: 'Feature',
+    geometry: f.geometry,
+    properties: {
+      name: `Conflict (UN/OCHA): ${f.properties.ADMIN || f.properties.NAME || f.properties.ADM0_A3 || 'Country'}`,
+      key: (f.properties.ISO_A3 || f.properties.ADM0_A3 || '').toUpperCase(),
+    },
+  }));
+
+  if (features.length === 0) return;
+
+  const src = map.getSource('warzones');
+  if (src) src.setData({ type: 'FeatureCollection', features });
+}

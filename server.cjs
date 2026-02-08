@@ -46,6 +46,9 @@ const PROXY_ROUTES = {
   '/liveatc': { host: 'd.liveatc.net', prefix: '/liveatc', secure: true },
 };
 
+// OCHA API identifiers (required by OCHA-run APIs; request approval from OCHA/ReliefWeb/HDX).
+const OCHA_RELIEFWEB_APPNAME = process.env.OCHA_RELIEFWEB_APPNAME || '';
+
 function proxyRequest(clientReq, clientRes, route) {
   const targetPath = clientReq.url.replace(new RegExp('^' + route.prefix), '') || '/';
   _doProxy(clientReq, clientRes, route.host, targetPath, route.secure !== false, 0);
@@ -253,6 +256,75 @@ function handleRequest(req, res) {
     }).catch((err) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
+    });
+    return;
+  }
+
+  // OCHA war country list (requires approved ReliefWeb appname)
+  if (req.url.startsWith('/ocha-war-countries')) {
+    if (!OCHA_RELIEFWEB_APPNAME) {
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({
+        authoritative: false,
+        source: 'UN/OCHA',
+        error: 'OCHA_RELIEFWEB_APPNAME not configured (ReliefWeb API access is gated).',
+        iso3: [],
+      }));
+      return;
+    }
+
+    const url = `https://api.reliefweb.int/v2/disasters?appname=${encodeURIComponent(OCHA_RELIEFWEB_APPNAME)}&limit=1000`;
+    https.get(url, (rwRes) => {
+      let body = '';
+      rwRes.on('data', (c) => { body += c; });
+      rwRes.on('end', () => {
+        if (rwRes.statusCode !== 200) {
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({
+            authoritative: false,
+            source: 'UN/OCHA ReliefWeb',
+            error: `ReliefWeb request failed (${rwRes.statusCode}). Your appname may not be approved.`,
+            iso3: [],
+          }));
+          return;
+        }
+        try {
+          const json = JSON.parse(body);
+          const rows = Array.isArray(json.data) ? json.data : [];
+          const iso3 = new Set();
+          for (const r of rows) {
+            const f = r && r.fields ? r.fields : {};
+            const status = String(f.status || '').toLowerCase();
+            // Use only current/alert disasters
+            if (status && status !== 'current' && status !== 'alert') continue;
+            const types = Array.isArray(f.type) ? f.type : (f.type ? [f.type] : []);
+            const isConflict = types.some((t) => String((t && t.name) || '').toLowerCase().includes('conflict'));
+            if (!isConflict) continue;
+            const countries = Array.isArray(f.country) ? f.country : (f.country ? [f.country] : []);
+            for (const c of countries) {
+              const code = (c && (c.iso3 || c.iso)) ? String(c.iso3 || c.iso).toUpperCase() : '';
+              if (code && code.length === 3) iso3.add(code);
+            }
+          }
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=1800',
+          });
+          res.end(JSON.stringify({
+            authoritative: true,
+            source: 'UN/OCHA ReliefWeb',
+            updatedAt: Date.now(),
+            iso3: Array.from(iso3),
+          }));
+        } catch (e) {
+          res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({ authoritative: false, source: 'UN/OCHA ReliefWeb', error: e.message, iso3: [] }));
+        }
+      });
+    }).on('error', (err) => {
+      res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ authoritative: false, source: 'UN/OCHA ReliefWeb', error: err.message, iso3: [] }));
     });
     return;
   }

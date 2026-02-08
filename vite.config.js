@@ -81,8 +81,85 @@ function liveatcFeedsPlugin() {
   };
 }
 
+function ochaWarCountriesPlugin() {
+  const appname = process.env.OCHA_RELIEFWEB_APPNAME || '';
+  return {
+    name: 'ocha-war-countries',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url.startsWith('/ocha-war-countries')) return next();
+
+        if (!appname) {
+          res.statusCode = 503;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            authoritative: false,
+            source: 'UN/OCHA',
+            error: 'OCHA_RELIEFWEB_APPNAME not configured (ReliefWeb API access is gated).',
+            iso3: [],
+          }));
+          return;
+        }
+
+        const url = `https://api.reliefweb.int/v2/disasters?appname=${encodeURIComponent(appname)}&limit=1000`;
+        https.get(url, (rwRes) => {
+          let body = '';
+          rwRes.on('data', (c) => { body += c; });
+          rwRes.on('end', () => {
+            if (rwRes.statusCode !== 200) {
+              res.statusCode = 503;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({
+                authoritative: false,
+                source: 'UN/OCHA ReliefWeb',
+                error: `ReliefWeb request failed (${rwRes.statusCode}). Your appname may not be approved.`,
+                iso3: [],
+              }));
+              return;
+            }
+            try {
+              const json = JSON.parse(body);
+              const rows = Array.isArray(json.data) ? json.data : [];
+              const iso3 = new Set();
+              for (const r of rows) {
+                const f = r && r.fields ? r.fields : {};
+                const status = String(f.status || '').toLowerCase();
+                if (status && status !== 'current' && status !== 'alert') continue;
+                const types = Array.isArray(f.type) ? f.type : (f.type ? [f.type] : []);
+                const isConflict = types.some((t) => String((t && t.name) || '').toLowerCase().includes('conflict'));
+                if (!isConflict) continue;
+                const countries = Array.isArray(f.country) ? f.country : (f.country ? [f.country] : []);
+                for (const c of countries) {
+                  const code = (c && (c.iso3 || c.iso)) ? String(c.iso3 || c.iso).toUpperCase() : '';
+                  if (code && code.length === 3) iso3.add(code);
+                }
+              }
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({
+                authoritative: true,
+                source: 'UN/OCHA ReliefWeb',
+                updatedAt: Date.now(),
+                iso3: Array.from(iso3),
+              }));
+            } catch (e) {
+              res.statusCode = 503;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ authoritative: false, source: 'UN/OCHA ReliefWeb', error: e.message, iso3: [] }));
+            }
+          });
+        }).on('error', (err) => {
+          res.statusCode = 503;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ authoritative: false, source: 'UN/OCHA ReliefWeb', error: err.message, iso3: [] }));
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [liveatcFeedsPlugin()],
+  plugins: [liveatcFeedsPlugin(), ochaWarCountriesPlugin()],
   server: {
     port: 3000,
     host: true,
