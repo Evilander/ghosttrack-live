@@ -350,7 +350,6 @@ async function setupLayers() {
     },
   });
 
-  // Projected trajectory vectors (3-minute future position)
   map.addLayer({
     id: 'aircraft-vectors',
     type: 'line',
@@ -1039,21 +1038,17 @@ async function init() {
       }
     }, 3000);
 
-    // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      // ESC — close detail panel
       if (e.key === 'Escape' && getSelectedIcao()) {
         hidePanel();
         return;
       }
-      // / or Ctrl+K — focus search
       if ((e.key === '/' || (e.key === 'k' && (e.ctrlKey || e.metaKey))) && document.activeElement?.id !== 'search-input') {
         e.preventDefault();
         const searchInput = document.getElementById('search-input');
         if (searchInput) searchInput.focus();
         return;
       }
-      // F — toggle follow mode when panel is open
       if (e.key === 'f' && getSelectedIcao() && document.activeElement?.tagName !== 'INPUT') {
         const followBtn = document.getElementById('btn-follow');
         if (followBtn) followBtn.click();
