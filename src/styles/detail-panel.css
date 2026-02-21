@@ -8,20 +8,19 @@
 .detail-panel {
   position: fixed;
   top: 0;
-  right: -380px;
-  width: 360px;
+  right: -420px;
+  width: 400px;
   height: 100%;
-  background: rgba(10, 14, 23, 0.95);
-  border-left: 1px solid rgba(0, 255, 136, 0.2);
+  background: rgba(4, 9, 18, 0.95);
+  border-left: 1px solid rgba(0, 255, 204, 0.3);
+  box-shadow: -10px 0 30px rgba(0,0,0,0.8);
   z-index: 20;
-  transition: right 0.3s ease;
-  padding: 24px;
+  transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 30px;
   box-sizing: border-box;
   overflow-y: auto;
-  color: #00ff88;
-  text-shadow:
-    0 0 6px rgba(0, 255, 136, 0.4),
-    0 0 12px rgba(0, 255, 136, 0.15);
+  color: #00ffcc;
+  background-image: radial-gradient(circle at 100% 0%, rgba(0, 255, 204, 0.05) 0%, transparent 50%);
 }
 
 .detail-panel:not(.hidden) {
@@ -59,22 +58,24 @@
 }
 
 .detail-callsign {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 700;
-  color: #FFA500;
-  letter-spacing: 2px;
+  color: #fff;
+  letter-spacing: 3px;
   display: block;
-  text-shadow:
-    0 0 10px rgba(255, 165, 0, 0.4),
-    0 0 20px rgba(255, 165, 0, 0.15);
+  text-shadow: 0 0 15px rgba(255,255,255,0.5);
 }
 
 .detail-status {
-  font-size: 12px;
-  opacity: 0.6;
-  letter-spacing: 1px;
+  font-size: 11px;
+  opacity: 0.8;
+  letter-spacing: 2px;
   text-transform: uppercase;
   margin-top: 4px;
+  background: rgba(0, 255, 204, 0.2);
+  padding: 2px 6px;
+  border-radius: 2px;
+  display: inline-block;
 }
 
 /* --- Data Grid --- */
@@ -86,10 +87,17 @@
 }
 
 .detail-cell {
-  background: rgba(0, 255, 136, 0.03);
-  border: 1px solid rgba(0, 255, 136, 0.08);
-  border-radius: 4px;
+  background: rgba(0, 20, 40, 0.4);
+  border: 1px solid rgba(0, 255, 204, 0.15);
   padding: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.detail-cell::after {
+  content: ''; position: absolute; inset: 0; opacity: 0.05; pointer-events: none;
+  background-image: linear-gradient(#00ffcc 1px, transparent 1px), linear-gradient(90deg, #00ffcc 1px, transparent 1px);
+  background-size: 10px 10px;
 }
 
 .detail-cell.full-width {
@@ -97,11 +105,11 @@
 }
 
 .detail-label {
-  font-size: 10px;
+  font-size: 9px;
   letter-spacing: 2px;
   text-transform: uppercase;
-  opacity: 0.5;
-  margin-bottom: 4px;
+  color: #a0c0d0;
+  margin-bottom: 6px;
 }
 
 .detail-value {
@@ -522,10 +530,10 @@
 
 .atc-visualizer {
   width: 100%;
-  height: 40px;
-  border-radius: 3px;
-  background: rgba(0, 10, 5, 0.6);
-  border: 1px solid rgba(0, 255, 136, 0.08);
+  height: 60px;
+  background: #000;
+  border: 1px solid #00ffcc;
+  box-shadow: inset 0 0 10px rgba(0,255,204,0.2);
   display: block;
 }
 
