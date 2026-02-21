@@ -350,6 +350,20 @@ async function setupLayers() {
     },
   });
 
+  // Projected trajectory vectors (3-minute future position)
+  map.addLayer({
+    id: 'aircraft-vectors',
+    type: 'line',
+    source: 'aircraft',
+    filter: ['==', ['get', 'isVector'], 1],
+    paint: {
+      'line-color': ['get', 'color'],
+      'line-width': 1,
+      'line-opacity': 0.3,
+      'line-dasharray': [3, 4],
+    },
+  });
+
   // Individual aircraft icons
   map.addLayer({
     id: 'aircraft-icons',
@@ -997,6 +1011,13 @@ async function init() {
     // Initial fetch
     await fetchAndUpdate();
 
+    // Dismiss loading splash
+    const splash = document.getElementById('loading-splash');
+    if (splash) {
+      splash.classList.add('fade-out');
+      setTimeout(() => splash.remove(), 1000);
+    }
+
     // Re-fetch when user pans or zooms (debounced)
     let moveTimer = null;
     map.on('moveend', () => {
@@ -1017,6 +1038,28 @@ async function init() {
         updateGhostPosition(3000);
       }
     }, 3000);
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // ESC — close detail panel
+      if (e.key === 'Escape' && getSelectedIcao()) {
+        hidePanel();
+        return;
+      }
+      // / or Ctrl+K — focus search
+      if ((e.key === '/' || (e.key === 'k' && (e.ctrlKey || e.metaKey))) && document.activeElement?.id !== 'search-input') {
+        e.preventDefault();
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.focus();
+        return;
+      }
+      // F — toggle follow mode when panel is open
+      if (e.key === 'f' && getSelectedIcao() && document.activeElement?.tagName !== 'INPUT') {
+        const followBtn = document.getElementById('btn-follow');
+        if (followBtn) followBtn.click();
+        return;
+      }
+    });
   });
 }
 

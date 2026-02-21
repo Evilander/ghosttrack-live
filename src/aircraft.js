@@ -177,9 +177,10 @@ export function parseAircraftState(ac) {
 }
 
 export function toGeoJSON(aircraft) {
-  return {
-    type: 'FeatureCollection',
-    features: aircraft.map((a) => ({
+  const features = [];
+
+  for (const a of aircraft) {
+    features.push({
       type: 'Feature',
       geometry: {
         type: 'Point',
@@ -204,8 +205,24 @@ export function toGeoJSON(aircraft) {
         squawk: a.squawk || '',
         dbFlags: a.dbFlags || 0,
       },
-    })),
-  };
+    });
+
+    if (!a.on_ground && a.speed_kts > 50 && a.latitude != null && a.longitude != null && a.true_track != null) {
+      const distNm = (a.speed_kts / 60) * 3;
+      const distDeg = distNm / 60;
+      const headingRad = a.true_track * (Math.PI / 180);
+      const futureLat = a.latitude + (distDeg * Math.cos(headingRad));
+      const futureLon = a.longitude + (distDeg * Math.sin(headingRad) / Math.cos(a.latitude * (Math.PI / 180)));
+
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: [[a.longitude, a.latitude], [futureLon, futureLat]] },
+        properties: { isVector: 1, color: a.color },
+      });
+    }
+  }
+
+  return { type: 'FeatureCollection', features };
 }
 
 // Fetch aircraft within a geographic radius from a single point

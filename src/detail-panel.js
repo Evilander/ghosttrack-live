@@ -50,6 +50,8 @@ let atcAudioCtx = null;
 let atcAnalyser = null;
 let atcSource = null;
 let atcVisRAF = null;
+let staticNode = null;
+let staticGain = null;
 const atcFeedCache = new Map(); // icao -> { feeds, ts }
 
 // ---- ATC Audio Player ----
@@ -100,11 +102,28 @@ function ensureAudioContext() {
   if (atcAudioCtx) return;
   atcAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   atcAnalyser = atcAudioCtx.createAnalyser();
-  atcAnalyser.fftSize = 256;
-  atcAnalyser.smoothingTimeConstant = 0.7;
+  atcAnalyser.fftSize = 128;
+  atcAnalyser.smoothingTimeConstant = 0.5;
   atcSource = atcAudioCtx.createMediaElementSource(els.atcAudio);
+
+  // White noise generator for radio static fallback
+  const bufferSize = atcAudioCtx.sampleRate * 2;
+  const noiseBuffer = atcAudioCtx.createBuffer(1, bufferSize, atcAudioCtx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) { output[i] = (Math.random() * 2 - 1) * 0.1; }
+
+  staticNode = atcAudioCtx.createBufferSource();
+  staticNode.buffer = noiseBuffer;
+  staticNode.loop = true;
+
+  staticGain = atcAudioCtx.createGain();
+  staticGain.gain.value = 0.15;
+
   atcSource.connect(atcAnalyser);
+  staticNode.connect(staticGain);
+  staticGain.connect(atcAnalyser);
   atcAnalyser.connect(atcAudioCtx.destination);
+  staticNode.start();
 }
 
 function startVisualizer() {
@@ -118,28 +137,33 @@ function startVisualizer() {
     atcVisRAF = requestAnimationFrame(draw);
     atcAnalyser.getByteFrequencyData(dataArr);
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(0, 5, 10, 0.4)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const barCount = 48;
-    const barW = canvas.width / barCount;
-    const step = Math.floor(bufLen / barCount);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#00ffcc';
+    ctx.beginPath();
 
-    for (let i = 0; i < barCount; i++) {
-      const val = dataArr[i * step] / 255;
-      const barH = val * canvas.height;
-      const x = i * barW;
-      const g = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barH);
-      g.addColorStop(0, 'rgba(0,255,136,0.6)');
-      g.addColorStop(1, 'rgba(0,255,136,0.15)');
-      ctx.fillStyle = g;
-      ctx.fillRect(x + 1, canvas.height - barH, barW - 2, barH);
+    const sliceWidth = canvas.width / bufLen;
+    let x = 0;
+
+    for (let i = 0; i < bufLen; i++) {
+      const v = dataArr[i] / 128.0;
+      const y = v * canvas.height / 2;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+      x += sliceWidth;
     }
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
 
-    // Scanline overlay
-    ctx.fillStyle = 'rgba(10,14,23,0.15)';
-    for (let y = 0; y < canvas.height; y += 3) {
-      ctx.fillRect(0, y, canvas.width, 1);
-    }
+    // Grid overlay on canvas
+    ctx.strokeStyle = 'rgba(0, 255, 204, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height / 2); ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.moveTo(canvas.width / 2, 0); ctx.lineTo(canvas.width / 2, canvas.height);
+    ctx.stroke();
   }
 
   draw();
@@ -334,7 +358,8 @@ function showAtcFeeds(data) {
 
 function initAtcPlayer() {
   els.atcAudio.addEventListener('playing', () => {
-    atcSetStatus('LIVE · ' + (atcActiveFeed || '').toUpperCase(), 'live');
+    atcSetStatus('UPLINK ESTABLISHED · ' + (atcActiveFeed || '').toUpperCase(), 'live');
+    if (staticGain) staticGain.gain.value = 0;
     try {
       ensureAudioContext();
       if (atcAudioCtx.state === 'suspended') atcAudioCtx.resume();
@@ -346,6 +371,7 @@ function initAtcPlayer() {
 
   els.atcAudio.addEventListener('waiting', () => {
     atcSetStatus('BUFFERING...', 'connecting');
+    if (staticGain) staticGain.gain.value = 0.1;
   });
 
   els.atcAudio.addEventListener('error', () => {
@@ -356,8 +382,9 @@ function initAtcPlayer() {
       activeBtn.classList.remove('active');
       activeBtn.classList.add('error');
     }
-    atcSetStatus('STREAM UNAVAILABLE', 'error');
-    stopVisualizer();
+    atcSetStatus('SIGNAL LOST - SEARCHING FREQUENCY', 'error');
+    if (staticGain) staticGain.gain.value = 0.15;
+    try { ensureAudioContext(); startVisualizer(); } catch {}
     atcActiveFeed = null;
   });
 

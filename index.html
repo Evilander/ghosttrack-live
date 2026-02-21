@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GhostTrack Live</title>
+  <title>GhostTrack Live — Global Flight Intelligence</title>
+  <meta name="description" content="Real-time global ADS-B flight tracking with military-grade tactical telemetry interface" />
+  <meta name="theme-color" content="#02060d" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet" />
@@ -19,7 +21,7 @@
 
   <!-- HUD Top Left -->
   <div id="hud-top-left" class="hud">
-    <div class="hud-brand">GHOSTTRACK<span class="hud-brand-dim"> LIVE</span></div>
+    <div class="hud-brand">GHOSTTRACK<span class="hud-brand-dim"> LIVE</span> <span class="hud-version">v2.0</span></div>
     <div class="hud-divider"></div>
     <div class="hud-row">
       <span id="heartbeat" class="heartbeat"></span>
@@ -64,7 +66,7 @@
   <!-- Search Bar -->
   <div id="search-bar" class="search-bar">
     <span class="search-icon">⌕</span>
-    <input id="search-input" type="text" placeholder="SEARCH CALLSIGN..." autocomplete="off" spellcheck="false" />
+    <input id="search-input" type="text" placeholder="SEARCH CALLSIGN... (press /)" autocomplete="off" spellcheck="false" />
     <div id="search-results" class="search-results hidden"></div>
   </div>
 
@@ -216,7 +218,7 @@
         <div id="atc-airport-tabs" class="atc-airport-tabs"></div>
         <div id="atc-feeds" class="atc-feeds"></div>
         <div class="atc-visualizer-row">
-          <canvas id="atc-visualizer" class="atc-visualizer" width="312" height="40"></canvas>
+          <canvas id="atc-visualizer" class="atc-visualizer" width="340" height="60"></canvas>
         </div>
         <div class="atc-now-playing">
           <span id="atc-status-text" class="atc-status-text">SELECT AIRPORT</span>
@@ -347,6 +349,18 @@
   </div>
 
   <div class="creator-watermark">created by Evilander</div>
+
+  <!-- Loading Splash -->
+  <div id="loading-splash" class="loading-splash">
+    <div class="loading-content">
+      <div class="loading-brand">GHOSTTRACK<span class="loading-brand-dim"> LIVE</span></div>
+      <div class="loading-sub">GLOBAL FLIGHT INTELLIGENCE SYSTEM</div>
+      <div class="loading-bar-track">
+        <div class="loading-bar"></div>
+      </div>
+      <div class="loading-status">INITIALIZING TELEMETRY...</div>
+    </div>
+  </div>
 
   <script type="module" src="/src/main.js"></script>
 </body>

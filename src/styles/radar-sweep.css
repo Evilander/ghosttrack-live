@@ -14,16 +14,15 @@
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 5;
-  opacity: 0.04;
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    transparent 350deg,
-    rgba(0, 255, 136, 0.3) 355deg,
-    transparent 360deg
+    transparent 340deg,
+    rgba(0, 255, 204, 0.05) 358deg,
+    rgba(0, 255, 204, 0.4) 360deg
   );
   border-radius: 50%;
-  animation: radar-spin 8s linear infinite;
+  animation: radar-spin 6s linear infinite;
 }
 
 @keyframes radar-spin {
