@@ -106,11 +106,10 @@ function ensureAudioContext() {
   atcAnalyser.smoothingTimeConstant = 0.5;
   atcSource = atcAudioCtx.createMediaElementSource(els.atcAudio);
 
-  // White noise generator for radio static fallback
   const bufferSize = atcAudioCtx.sampleRate * 2;
   const noiseBuffer = atcAudioCtx.createBuffer(1, bufferSize, atcAudioCtx.sampleRate);
-  const output = noiseBuffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) { output[i] = (Math.random() * 2 - 1) * 0.1; }
+  const noiseData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) { noiseData[i] = (Math.random() * 2 - 1) * 0.1; }
 
   staticNode = atcAudioCtx.createBufferSource();
   staticNode.buffer = noiseBuffer;
@@ -157,7 +156,6 @@ function startVisualizer() {
     ctx.lineTo(canvas.width, canvas.height / 2);
     ctx.stroke();
 
-    // Grid overlay on canvas
     ctx.strokeStyle = 'rgba(0, 255, 204, 0.1)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -178,8 +176,7 @@ function stopVisualizer() {
   if (canvas) {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // Draw idle line
-    ctx.strokeStyle = 'rgba(0,255,136,0.15)';
+    ctx.strokeStyle = 'rgba(0,255,204,0.15)';
     ctx.beginPath();
     ctx.moveTo(0, canvas.height / 2);
     ctx.lineTo(canvas.width, canvas.height / 2);

@@ -32,19 +32,13 @@ function generateGraticule() {
   for (let lng = -180; lng <= 180; lng += 10) {
     features.push({
       type: 'Feature',
-      geometry: {
-        type: 'LineString',
-        coordinates: [[-90, lng], [90, lng]].map(([lat, lon]) => [lon, lat]),
-      },
+      geometry: { type: 'LineString', coordinates: [[lng, -90], [lng, 90]] },
     });
   }
   for (let lat = -80; lat <= 80; lat += 10) {
     features.push({
       type: 'Feature',
-      geometry: {
-        type: 'LineString',
-        coordinates: [[-180, lat], [180, lat]].map(([lon, la]) => [lon, la]),
-      },
+      geometry: { type: 'LineString', coordinates: [[-180, lat], [180, lat]] },
     });
   }
   return { type: 'FeatureCollection', features };
