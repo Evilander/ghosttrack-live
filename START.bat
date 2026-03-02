@@ -7,6 +7,41 @@ echo   ============================================
 echo        G H O S T T R A C K   L I V E
 echo   ============================================
 echo.
+
+:: Check for Node.js
+where node >nul 2>&1
+if errorlevel 1 (
+  :: Try bundled node.exe as fallback
+  if exist "%~dp0node.exe" (
+    set NODE_CMD="%~dp0node.exe"
+    goto :HAVE_NODE
+  )
+  echo   ERROR: Node.js not found.
+  echo   Install from https://nodejs.org or place node.exe here.
+  pause
+  exit /b 1
+)
+set NODE_CMD=node
+
+:HAVE_NODE
+
+:: Build dist/ if it doesn't exist
+if not exist "%~dp0dist\index.html" (
+  echo   Building production bundle...
+  echo.
+  cd /d "%~dp0"
+  call npx vite build
+  if errorlevel 1 (
+    echo.
+    echo   ERROR: Build failed. Make sure dependencies are installed:
+    echo     npm install
+    echo.
+    pause
+    exit /b 1
+  )
+  echo.
+)
+
 echo   Selecting an open port...
 echo.
 
@@ -30,7 +65,7 @@ echo.
 start "" "http://localhost:%PORT%"
 
 :: Start the server (blocks — keeps window open)
-"%~dp0node.exe" "%~dp0server.cjs" --port %PORT%
+%NODE_CMD% "%~dp0server.cjs" --port %PORT%
 
 :: If server exits, show message
 echo.
