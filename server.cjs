@@ -192,6 +192,10 @@ const FEED_SUFFIXES = [
 const feedCache = new Map();
 const FEED_CACHE_TTL = 10 * 60 * 1000;
 
+let gdeltCache = null;
+let gdeltCacheTs = 0;
+const GDELT_CACHE_TTL = 5 * 60 * 1000;
+
 function probeFeed(feedName) {
   return new Promise((resolve) => {
     const req = https.request({
@@ -410,6 +414,34 @@ function handleRequest(req, res) {
     }).on('error', (err) => {
       res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify({ authoritative: false, source: 'UN/OCHA ReliefWeb', error: err.message, iso3: [] }));
+    });
+    return;
+  }
+
+  // GDELT conflict event proxy (Iran theater)
+  if (req.url === '/gdelt-conflict') {
+    if (gdeltCache && Date.now() - gdeltCacheTs < GDELT_CACHE_TTL) {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(gdeltCache);
+      return;
+    }
+    const gdeltUrl = 'https://api.gdeltproject.org/api/v2/geo/geo?' +
+      'query=(Iran+OR+Israel+OR+%22Epic+Fury%22+OR+%22Roaring+Lion%22+OR+Hormuz)+theme:CONFLICT&' +
+      'mode=PointData&format=GeoJSON&timespan=24h';
+    https.get(gdeltUrl, (gdeltRes) => {
+      let body = '';
+      gdeltRes.on('data', (c) => { body += c; });
+      gdeltRes.on('end', () => {
+        if (gdeltRes.statusCode === 200) {
+          gdeltCache = body;
+          gdeltCacheTs = Date.now();
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(body || '{"type":"FeatureCollection","features":[]}');
+      });
+    }).on('error', () => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end('{"type":"FeatureCollection","features":[]}');
     });
     return;
   }
