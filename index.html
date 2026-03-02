@@ -13,15 +13,40 @@
 <body>
   <div id="map"></div>
 
+  <!-- Vignette Overlay -->
+  <div id="vignette"></div>
+
   <!-- CRT Scanlines Overlay -->
   <div id="scanlines"></div>
 
   <!-- Radar Sweep -->
   <div id="radar-sweep"></div>
 
+  <!-- Targeting Reticle (shown on aircraft focus) -->
+  <div id="target-reticle" class="target-reticle hidden">
+    <div class="reticle-ring reticle-ring-outer"></div>
+    <div class="reticle-ring reticle-ring-inner"></div>
+    <div class="reticle-crosshair reticle-h"></div>
+    <div class="reticle-crosshair reticle-v"></div>
+    <div class="reticle-corner rc-tl"></div>
+    <div class="reticle-corner rc-tr"></div>
+    <div class="reticle-corner rc-bl"></div>
+    <div class="reticle-corner rc-br"></div>
+    <div class="reticle-label">TARGET LOCK</div>
+  </div>
+
+  <!-- Classification Banner -->
+  <div id="classification-banner" class="classification-banner">
+    <span class="classification-text">UNCLASSIFIED // FOUO</span>
+  </div>
+  <div id="classification-banner-bottom" class="classification-banner classification-bottom">
+    <span class="classification-text">SYSTEM: GHOSTTRACK // SIGINT FEED ACTIVE // IRAN THEATER: EPIC FURY / ROARING LION // NO FORN</span>
+  </div>
+
   <!-- HUD Top Left -->
   <div id="hud-top-left" class="hud">
     <div class="hud-brand">GHOSTTRACK<span class="hud-brand-dim"> LIVE</span> <span class="hud-version">v2.0</span></div>
+    <div class="hud-classification-tag">OPERATIONAL</div>
     <div class="hud-divider"></div>
     <div class="hud-row">
       <span id="heartbeat" class="heartbeat"></span>
@@ -37,8 +62,11 @@
     </div>
     <div class="hud-divider"></div>
     <div class="hud-row hud-row-sub">
-      <span class="hud-label">DATA AGE</span>
-      <span id="data-age">0s</span>
+      <span class="hud-label">FEED</span>
+      <span id="data-age" class="data-age-indicator">0s</span>
+      <span class="hud-sep">|</span>
+      <span class="hud-label">SIGINT</span>
+      <span class="sigint-status">ACTIVE</span>
     </div>
   </div>
 
@@ -258,6 +286,80 @@
     </div>
   </div>
 
+  <!-- Conflict Intelligence Briefing Button -->
+  <button id="conflict-briefing-btn" class="conflict-briefing-btn" title="Open conflict briefing">&#9888; EPIC FURY BRIEFING</button>
+
+  <!-- Conflict Intelligence Panel -->
+  <div id="conflict-panel" class="conflict-panel hidden">
+    <div class="conflict-panel-header">
+      <div class="conflict-panel-meta">
+        <span class="conflict-panel-tag">&#9888; ACTIVE CONFLICT</span>
+        <span class="conflict-panel-title">IRAN THEATER BRIEFING</span>
+        <span class="conflict-panel-subtitle">Feb 28 – present · 9 countries affected</span>
+      </div>
+      <button id="conflict-panel-close" class="conflict-panel-close">&times;</button>
+    </div>
+
+    <div class="conflict-ops-names">
+      <span class="conflict-op-badge israel">ISRAEL: ROARING LION</span>
+      <span class="conflict-op-badge us">US: EPIC FURY</span>
+    </div>
+
+    <div class="conflict-section">
+      <div class="conflict-section-title">STRAIT OF HORMUZ</div>
+      <div class="conflict-hormuz-stat">
+        <div class="conflict-hormuz-indicator"></div>
+        <span class="conflict-hormuz-text">DE FACTO BLOCKADE — 150+ TANKERS ANCHORED</span>
+      </div>
+      <div style="font-size:8px;color:rgba(224,240,255,0.5);line-height:1.5;">
+        20–30% of global oil/gas flows through this strait. Maersk, Hapag-Lloyd, CMA CGM, MSC suspended transits. Tanker "Skylight" struck near Khasab, Oman.
+      </div>
+      <button id="conflict-fly-to" class="conflict-fly-btn">FLY TO THEATER</button>
+    </div>
+
+    <div class="conflict-section">
+      <div class="conflict-section-title">CASUALTY SUMMARY (MAR 1 15:00 GMT)</div>
+      <div id="conflict-casualties"></div>
+    </div>
+
+    <div class="conflict-section">
+      <div class="conflict-section-title">DISPUTED / UNVERIFIED CLAIMS</div>
+      <div id="conflict-claims"></div>
+    </div>
+
+    <div class="conflict-section">
+      <div class="conflict-section-title">GDELT REAL-TIME INTEL FEED</div>
+      <div id="conflict-gdelt-feed" style="max-height:180px;overflow-y:auto;">
+        <div style="font-size:8px;color:rgba(224,240,255,0.3);">Loading GDELT data...</div>
+      </div>
+    </div>
+
+    <div class="conflict-source-note">
+      Data sources: AJLabs casualty tracker, CENTCOM, Al Jazeera, Israel-Alma, CBS News, Newsweek, NPR, Washington Post, GDELT Project. All figures are preliminary. "Verified" = confirmed by satellite imagery or multiple independent sources. "Claimed" = single-source, not independently confirmed.
+    </div>
+  </div>
+
+  <!-- Live Cam Player Panel -->
+  <div id="cam-player" class="cam-player hidden">
+    <div class="cam-player-header">
+      <div class="cam-player-meta">
+        <span class="cam-player-category">URBAN</span>
+        <span class="cam-player-title">---</span>
+        <span class="cam-player-location">---</span>
+      </div>
+      <button id="cam-player-close" class="cam-player-close">&times;</button>
+    </div>
+    <div class="cam-player-viewport">
+      <iframe class="cam-player-iframe" src="about:blank" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    </div>
+    <div class="cam-player-footer">
+      <a class="cam-player-fallback" href="#" target="_blank" rel="noopener" style="display:none">OPEN SOURCE</a>
+      <div class="cam-player-nav">
+        <div id="cam-player-list" class="cam-player-list"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Left-side tracker stack (watchlist + TCAS) -->
   <div id="tracker-stack" class="tracker-stack">
     <!-- Anomaly Tracker -->
@@ -324,6 +426,8 @@
         <label class="filter-check"><input type="checkbox" id="filter-poi" checked /> Show points of interest</label>
         <label class="filter-check"><input type="checkbox" id="filter-landings" /> Show VIP/PVT last landings</label>
         <label class="filter-check"><input type="checkbox" id="filter-warzones" checked /> Show warzones</label>
+        <label class="filter-check"><input type="checkbox" id="filter-livecams" checked /> Show live cams</label>
+        <label class="filter-check"><input type="checkbox" id="filter-conflict" checked /><span class="filter-dot" style="background:#ff4444"></span> Conflict intel</label>
         <label class="filter-check"><input type="checkbox" id="filter-watchlist" checked /> Show watchlist panel</label>
       </div>
       <div class="filter-section">
@@ -350,15 +454,50 @@
 
   <div class="creator-watermark">created by Evilander</div>
 
-  <!-- Loading Splash -->
+  <!-- Intel Ticker -->
+  <div id="intel-ticker" class="intel-ticker">
+    <div class="intel-ticker-content">
+      <span class="intel-ticker-item">GLOBAL SURVEILLANCE NETWORK ONLINE</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">ADS-B FEEDS NOMINAL</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">THREAT ASSESSMENT: ELEVATED — EPIC FURY / ROARING LION ACTIVE</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">SIGINT CHANNELS ACTIVE</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">TCAS MONITORING ENABLED</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">VIP TRACKING OPERATIONAL</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">GLOBAL SURVEILLANCE NETWORK ONLINE</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">ADS-B FEEDS NOMINAL</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">THREAT ASSESSMENT: ELEVATED — EPIC FURY / ROARING LION ACTIVE</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">SIGINT CHANNELS ACTIVE</span>
+    </div>
+  </div>
+
+  <!-- Loading Splash — Boot Sequence -->
   <div id="loading-splash" class="loading-splash">
     <div class="loading-content">
+      <div class="loading-classification">TOP SECRET // SI // NOFORN</div>
       <div class="loading-brand">GHOSTTRACK<span class="loading-brand-dim"> LIVE</span></div>
-      <div class="loading-sub">GLOBAL FLIGHT INTELLIGENCE SYSTEM</div>
+      <div class="loading-sub">GLOBAL FLIGHT INTELLIGENCE PLATFORM</div>
+      <div class="loading-sub loading-sub-small">DEFENSE INTELLIGENCE NETWORK — SECTOR 7</div>
       <div class="loading-bar-track">
         <div class="loading-bar"></div>
       </div>
-      <div class="loading-status">INITIALIZING TELEMETRY...</div>
+      <div class="loading-boot-log">
+        <div class="boot-line" style="animation-delay:0.2s">[SYS] Initializing secure uplink...</div>
+        <div class="boot-line" style="animation-delay:0.6s">[NET] ADS-B receiver mesh connected</div>
+        <div class="boot-line" style="animation-delay:1.0s">[INT] SIGINT feed authenticated</div>
+        <div class="boot-line" style="animation-delay:1.4s">[MAP] Geospatial engine loaded</div>
+        <div class="boot-line" style="animation-delay:1.8s">[OPS] Threat detection online</div>
+        <div class="boot-line" style="animation-delay:2.0s">[INTEL] Iran theater — EPIC FURY / ROARING LION active</div>
+      </div>
+      <div class="loading-status">ESTABLISHING TELEMETRY LINK...</div>
     </div>
   </div>
 
