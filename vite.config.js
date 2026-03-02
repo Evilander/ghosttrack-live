@@ -222,8 +222,51 @@ function coopPlugin() {
   };
 }
 
+// GDELT conflict event proxy — fetches geolocated conflict articles for Iran theater
+function gdeltConflictPlugin() {
+  let cache = null;
+  let cacheTs = 0;
+  const CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+  return {
+    name: 'gdelt-conflict',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url !== '/gdelt-conflict') return next();
+
+        const now = Date.now();
+        if (cache && now - cacheTs < CACHE_TTL) {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(cache);
+          return;
+        }
+
+        const url = 'https://api.gdeltproject.org/api/v2/geo/geo?' +
+          'query=(Iran+OR+Israel+OR+"Epic Fury"+OR+"Roaring Lion"+OR+Hormuz)+theme:CONFLICT&' +
+          'mode=PointData&format=GeoJSON&timespan=24h';
+
+        https.get(url, (gdeltRes) => {
+          let body = '';
+          gdeltRes.on('data', (c) => { body += c; });
+          gdeltRes.on('end', () => {
+            if (gdeltRes.statusCode === 200) {
+              cache = body;
+              cacheTs = now;
+            }
+            res.setHeader('Content-Type', 'application/json');
+            res.end(body || '{"type":"FeatureCollection","features":[]}');
+          });
+        }).on('error', () => {
+          res.setHeader('Content-Type', 'application/json');
+          res.end('{"type":"FeatureCollection","features":[]}');
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [liveatcFeedsPlugin(), ochaWarCountriesPlugin(), coopPlugin()],
+  plugins: [liveatcFeedsPlugin(), ochaWarCountriesPlugin(), coopPlugin(), gdeltConflictPlugin()],
   server: {
     port: 3000,
     host: true,

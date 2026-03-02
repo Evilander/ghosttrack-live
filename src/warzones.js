@@ -23,13 +23,25 @@ const FALLBACK_WARZONE_AREAS = [
   {
     name: 'Gaza / Israel',
     key: 'gaza_israel',
-    desc: 'Israel-Hamas conflict. Ongoing military operations in Gaza since Oct 2023. Airstrikes, ground operations, and humanitarian crisis. Ben Gurion and regional airports intermittently disrupted.',
+    desc: 'Israel-Hamas conflict. Ongoing military operations in Gaza since Oct 2023. Now expanded: Operation Roaring Lion strikes on Iran (Feb 28, 2026). Iranian retaliation hit Israel with 11+ killed, ~500 wounded.',
     polygon: [
       [34.0, 32.2],
       [35.9, 32.2],
       [35.9, 30.8],
       [34.0, 30.8],
       [34.0, 32.2],
+    ],
+  },
+  {
+    name: 'Iran — Epic Fury / Roaring Lion',
+    key: 'iran_epicfury',
+    desc: 'Active US-Israel joint military operations since Feb 28, 2026. Supreme Leader killed. Strikes across 24+ provinces. Iranian retaliation hit 9 countries. Strait of Hormuz de facto blockade. 201+ killed in Iran, 747+ wounded.',
+    polygon: [
+      [44.0, 40.0],
+      [63.5, 40.0],
+      [63.5, 25.0],
+      [44.0, 25.0],
+      [44.0, 40.0],
     ],
   },
   {

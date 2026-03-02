@@ -3,6 +3,7 @@ import './styles/main.css';
 import './styles/hud.css';
 import './styles/detail-panel.css';
 import './styles/radar-sweep.css';
+import './styles/livecam.css';
 
 import { createMap } from './map.js';
 import { fetchAircraft, toGeoJSON, setVipHexes, fetchVipAircraft } from './aircraft.js';
@@ -26,6 +27,9 @@ import { initTheater } from './theater.js';
 import { initLandings, toggleLandings, updateLandingsFromAircraft } from './landings.js';
 import { initWarzones, toggleWarzones } from './warzones.js';
 import { initCoop, isCoopEnabled, isCoopHost, getCoopRoom, getShareUrl, enableCoopHost, enableCoopFollow, disableCoop, coopBroadcastSelection } from './coop.js';
+import { initLiveCams, toggleLiveCams } from './livecams.js';
+import { initConflictIntel, toggleConflictIntel, openBriefingPanel } from './conflict-intel.js';
+import './styles/conflict-intel.css';
 
 const FETCH_INTERVAL = 5000;
 const MAX_AIRCRAFT = 3000; // Cap to prevent browser crash
@@ -40,6 +44,12 @@ let tcasEnabled = true;
 let tcasSkip = false; // alternate: skip every other fetch cycle
 let showLandings = false;
 let showWarzones = true;
+let showLiveCams = true;
+let showConflict = true;
+
+// Cinematic camera state — store pre-focus view so we can snap back
+let preFocusCamera = null;
+let focusedOnAircraft = false;
 
 // Emergency state tracking — only alert on NEW emergencies
 const knownEmergencies = new Set();
@@ -60,7 +70,6 @@ function showEmergencyBanner(ac, reason) {
   void el.offsetWidth;
   el.classList.add('visible');
 
-  // Click banner to fly to aircraft
   const clickHandler = () => {
     showPanel(ac);
     if (ac.longitude != null && ac.latitude != null) {
@@ -74,7 +83,6 @@ function showEmergencyBanner(ac, reason) {
   const closeBtn = document.getElementById('emergency-alert-close');
   if (closeBtn) closeBtn.onclick = (e) => { e.stopPropagation(); dismissEmergencyBanner(); };
 
-  // Auto-dismiss after 12 seconds
   if (emergencyAlertTimer) clearTimeout(emergencyAlertTimer);
   emergencyAlertTimer = setTimeout(dismissEmergencyBanner, 12000);
 }
@@ -87,7 +95,6 @@ function dismissEmergencyBanner() {
   if (emergencyAlertTimer) { clearTimeout(emergencyAlertTimer); emergencyAlertTimer = null; }
 }
 
-// Top stats DOM
 const statFastest = document.getElementById('stat-fastest');
 const statHighest = document.getElementById('stat-highest');
 const statClements = document.getElementById('stat-clements');
@@ -99,7 +106,6 @@ const statVipCount = document.getElementById('stat-vip-count');
 const statPvtCount = document.getElementById('stat-pvt-count');
 const statTicker = document.getElementById('stat-ticker');
 
-// Store references for click-to-fly on leaderboard rows
 const leaderboardAircraft = {};
 
 function fmtAircraftLine(ac, extra) {
@@ -166,7 +172,6 @@ function updateTopFlightStats(aircraft) {
     if (a.aircraft_type && isPrivateJetType(a.aircraft_type)) pvtCount++;
   }
 
-  // Update DOM
   if (statFastest) statFastest.textContent = fastest ? fmtAircraftLine(fastest, `${fastest.speed_kts} kts`) : '---';
   if (statHighest) statHighest.textContent = highest ? fmtAircraftLine(highest, `${Math.round(highest.altitude_ft).toLocaleString()} ft`) : '---';
   if (statClements) statClements.textContent = topMil ? fmtAircraftLine(topMil, `${topMil.speed_kts} kts`) : '---';
@@ -177,7 +182,6 @@ function updateTopFlightStats(aircraft) {
   if (statVipCount) statVipCount.textContent = String(vipCount);
   if (statPvtCount) statPvtCount.textContent = String(pvtCount);
 
-  // Store for click-to-fly
   leaderboardAircraft.fastest = fastest;
   leaderboardAircraft.highest = highest;
   leaderboardAircraft.clements = topMil;
@@ -195,7 +199,6 @@ function updateTopFlightStats(aircraft) {
   }
 }
 
-// Hover tooltip
 const tooltipEl = document.getElementById('hover-tooltip');
 const tooltipCallsign = document.getElementById('tooltip-callsign');
 const tooltipInfo = document.getElementById('tooltip-info');
@@ -460,13 +463,11 @@ function pushToMap(aircraft) {
     }
   }
 
-  // Update aircraft source — single setData call
   const source = map.getSource('aircraft');
   if (source) {
     source.setData(toGeoJSON(combined));
   }
 
-  // Record and update trails
   recordPositions(combined);
   if (showTrails) {
     const trailSource = map.getSource('trails');
@@ -475,7 +476,6 @@ function pushToMap(aircraft) {
     }
   }
 
-  // Update detail panel if aircraft selected
   const selectedIcao = getSelectedIcao();
   if (selectedIcao) {
     const selected = combined.find((a) => a.icao24 === selectedIcao);
@@ -484,7 +484,7 @@ function pushToMap(aircraft) {
       if (isFollowing() && selected.longitude != null) {
         map.easeTo({
           center: [selected.longitude, selected.latitude],
-          duration: 1000,
+          duration: 250,
         });
       }
     }
@@ -492,9 +492,13 @@ function pushToMap(aircraft) {
 }
 
 let fetchInProgress = false;
+// Keep a map of recently-seen aircraft so they don't pop out instantly on zoom
+const recentAircraftMap = new Map(); // icao24 → { aircraft, lastSeen }
+const AIRCRAFT_STALENESS_MS = 30000; // keep unseen aircraft for 30s to prevent pop-out
 
 async function fetchAndUpdate() {
   if (fetchInProgress) return;
+  if (document.hidden) return; // save bandwidth when tab not visible
   fetchInProgress = true;
   try {
     const [aircraft, vipAircraft] = await Promise.all([
@@ -508,9 +512,19 @@ async function fetchAndUpdate() {
     for (const ac of vipAircraft) {
       if (!seen.has(ac.icao24)) seen.set(ac.icao24, ac);
     }
-    allAircraft = Array.from(seen.values());
 
-    // Feed interpolation engine with new positions
+    // Update recent aircraft cache — fresh data wins, stale data kept briefly
+    const now = Date.now();
+    for (const [id, ac] of seen) {
+      recentAircraftMap.set(id, { aircraft: ac, lastSeen: now });
+    }
+    for (const [id, entry] of recentAircraftMap) {
+      if (now - entry.lastSeen > AIRCRAFT_STALENESS_MS) {
+        recentAircraftMap.delete(id);
+      }
+    }
+    allAircraft = Array.from(recentAircraftMap.values()).map(e => e.aircraft);
+
     updateStates(allAircraft, Date.now());
 
     const airborne = allAircraft.filter((a) => !a.on_ground).length;
@@ -526,7 +540,6 @@ async function fetchAndUpdate() {
     // Record VIP/private landings (airborne -> on_ground transition)
     updateLandingsFromAircraft(map, allAircraft);
 
-    // Update top flight stats
     updateTopFlightStats(allAircraft);
 
     // Detect anomalies (includes VIP from global scan)
@@ -549,17 +562,14 @@ async function fetchAndUpdate() {
       if (a.type === 'emergency') {
         currentEmergencies.add(a.aircraft.icao24);
         if (!knownEmergencies.has(a.aircraft.icao24)) {
-          // New emergency detected — sound the alarm + show banner
           playEmergencyAlert();
           showEmergencyBanner(a.aircraft, a.reason);
         }
       }
     }
-    // Update tracking set — clear resolved emergencies
     knownEmergencies.clear();
     for (const id of currentEmergencies) knownEmergencies.add(id);
 
-    // Ambience data blip on successful fetch
     playDataBlip();
 
     // TCAS proximity — runs every other fetch cycle to halve CPU cost,
@@ -595,10 +605,12 @@ async function fetchAndUpdate() {
   }
 }
 
-// Lightweight interpolation tick — only updates aircraft positions on the map
-// Skips trails, HUD, panel updates for speed. Runs at 100ms for near-live feel.
+// Lightweight interpolation tick — smoothly moves aircraft between API fetches.
+// Only updates point positions (skips velocity vectors, trails, HUD).
+// Runs at 250ms — balances smoothness vs. GPU churn.
 function interpolationTick() {
-  if (fetchInProgress || allAircraft.length === 0) return;
+  if (allAircraft.length === 0) return;
+  if (document.hidden) return; // skip when tab not visible
 
   const interpolated = getInterpolatedPositions(Date.now());
   if (interpolated.length === 0) return;
@@ -617,24 +629,53 @@ function interpolationTick() {
     }
   }
 
-  // Only update aircraft source — no trails, no HUD, no panel
+  // Build points-only GeoJSON (skip velocity vectors to cut feature count in half)
+  const features = combined.map(a => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [a.longitude, a.latitude] },
+    properties: {
+      icao24: a.icao24,
+      callsign: a.callsign,
+      origin_country: a.origin_country,
+      altitude_ft: a.altitude_ft,
+      speed_kts: a.speed_kts,
+      heading: Math.round(a.true_track || 0),
+      vertical_rate: a.vertical_rate,
+      vertical_rate_fpm: a.vertical_rate_fpm,
+      band: a.band,
+      color: a.color,
+      rotation: a.true_track || 0,
+      on_ground: a.on_ground ? 1 : 0,
+      isGhost: a.isGhost ? 1 : 0,
+      registration: a.registration || '',
+      aircraft_type: a.aircraft_type || '',
+      squawk: a.squawk || '',
+      dbFlags: a.dbFlags || 0,
+    },
+  }));
+
   const source = map.getSource('aircraft');
   if (source) {
-    source.setData(toGeoJSON(combined));
+    source.setData({ type: 'FeatureCollection', features });
   }
 
-  // Keep follow mode responsive
   const selectedIcao = getSelectedIcao();
   if (selectedIcao && isFollowing()) {
     const selected = combined.find(a => a.icao24 === selectedIcao);
     if (selected && selected.longitude != null) {
-      map.easeTo({ center: [selected.longitude, selected.latitude], duration: 100 });
+      map.easeTo({ center: [selected.longitude, selected.latitude], duration: 250 });
+    }
+  }
+
+  if (focusedOnAircraft && selectedIcao) {
+    const target = combined.find(a => a.icao24 === selectedIcao);
+    if (target && target.longitude != null) {
+      updateReticlePosition(target.longitude, target.latitude);
     }
   }
 }
 
 function setupInteraction() {
-  // Click on aircraft
   map.on('click', 'aircraft-icons', (e) => {
     if (!e.features || !e.features.length) return;
     const props = e.features[0].properties;
@@ -665,11 +706,34 @@ function setupInteraction() {
       checkInterceptTarget(aircraft);
     }
 
+    if (!focusedOnAircraft) {
+      preFocusCamera = {
+        center: map.getCenter().toArray(),
+        zoom: map.getZoom(),
+        pitch: map.getPitch(),
+        bearing: map.getBearing(),
+      };
+    }
+    focusedOnAircraft = true;
+
+    showTargetReticle(coords[0], coords[1]);
+
+    const heading = props.rotation || 0;
+    const targetBearing = (heading + 30) % 360; // offset from aircraft heading for drama
+    map.flyTo({
+      center: [coords[0], coords[1]],
+      zoom: Math.max(map.getZoom(), 10),
+      pitch: 55,
+      bearing: targetBearing,
+      duration: 2400,
+      essential: true,
+      curve: 1.4,
+    });
+
     showPanel(aircraft);
     if (isCoopHost()) coopBroadcastSelection(aircraft.icao24);
   });
 
-  // Click on cluster to zoom
   map.on('click', 'aircraft-clusters', (e) => {
     const features = map.queryRenderedFeatures(e.point, { layers: ['aircraft-clusters'] });
     const clusterId = features[0].properties.cluster_id;
@@ -679,7 +743,6 @@ function setupInteraction() {
     });
   });
 
-  // Hover tooltip
   map.on('mousemove', 'aircraft-icons', (e) => {
     if (!e.features || !e.features.length) return;
     map.getCanvas().style.cursor = 'pointer';
@@ -704,7 +767,6 @@ function setupInteraction() {
     tooltipEl.classList.add('hidden');
   });
 
-  // Cluster cursor
   map.on('mouseenter', 'aircraft-clusters', () => {
     map.getCanvas().style.cursor = 'pointer';
   });
@@ -712,15 +774,14 @@ function setupInteraction() {
     map.getCanvas().style.cursor = '';
   });
 
-  // Click on empty space closes panel
   map.on('click', (e) => {
-    const features = map.queryRenderedFeatures(e.point, { layers: ['aircraft-icons', 'aircraft-clusters'] });
+    const features = map.queryRenderedFeatures(e.point, { layers: ['aircraft-icons', 'aircraft-clusters', 'livecams-icons', 'livecams-glow'] });
     if (features.length === 0 && getSelectedIcao()) {
       hidePanel();
+      returnToGlobeView();
     }
   });
 
-  // Click landing markers for quick context (no panel)
   map.on('click', 'landings-dots', (e) => {
     if (!e.features || !e.features.length) return;
     const p = e.features[0].properties || {};
@@ -748,7 +809,6 @@ function setupInteraction() {
   map.on('mouseenter', 'landings-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'landings-dots', () => { map.getCanvas().style.cursor = ''; });
 
-  // Click warzones for conflict info popup
   map.on('click', 'warzones-fill', (e) => {
     if (!e.features || !e.features.length) return;
     const p = e.features[0].properties || {};
@@ -775,7 +835,7 @@ function handleFilterDisplayOptions() {
   if (groundCheck) {
     groundCheck.addEventListener('change', () => {
       showGround = groundCheck.checked;
-      pushToMap(allAircraft); // Re-render with new filter
+      pushToMap(allAircraft);
     });
   }
 
@@ -821,6 +881,27 @@ function handleFilterDisplayOptions() {
     });
   }
 
+  const livecamsCheck = document.getElementById('filter-livecams');
+  if (livecamsCheck) {
+    livecamsCheck.addEventListener('change', () => {
+      showLiveCams = livecamsCheck.checked;
+      toggleLiveCams(map, showLiveCams);
+    });
+  }
+
+  const conflictCheck = document.getElementById('filter-conflict');
+  if (conflictCheck) {
+    conflictCheck.addEventListener('change', () => {
+      showConflict = conflictCheck.checked;
+      toggleConflictIntel(map, showConflict);
+    });
+  }
+
+  const conflictBtn = document.getElementById('conflict-briefing-btn');
+  if (conflictBtn) {
+    conflictBtn.addEventListener('click', () => openBriefingPanel());
+  }
+
   const watchlistCheck = document.getElementById('filter-watchlist');
   const watchlistPanel = document.getElementById('anomaly-tracker');
   if (watchlistCheck && watchlistPanel) {
@@ -829,7 +910,6 @@ function handleFilterDisplayOptions() {
     });
   }
 
-  // Co-op controls
   const coopHostCheck = document.getElementById('filter-coop');
   const coopFollowCheck = document.getElementById('filter-coop-follow');
   const coopCopyBtn = document.getElementById('coop-copy-link');
@@ -900,7 +980,6 @@ function setupCollapsiblePanels() {
     });
   });
 
-  // Leaderboard click-to-fly
   const leaderboardRows = {
     'stat-row-fastest': 'fastest',
     'stat-row-highest': 'highest',
@@ -923,14 +1002,12 @@ function setupCollapsiblePanels() {
     }
   }
 
-  // TCAS on/off toggle
   const tcasCheck = document.getElementById('tcas-enabled');
   const tcasToggleText = tcasCheck ? tcasCheck.parentElement.querySelector('.tcas-toggle-text') : null;
   if (tcasCheck) {
     tcasCheck.addEventListener('change', () => {
       tcasEnabled = tcasCheck.checked;
       if (tcasToggleText) tcasToggleText.textContent = tcasEnabled ? 'ON' : 'OFF';
-      // Clear TCAS visuals immediately when disabled
       if (!tcasEnabled) {
         const src = map.getSource('tcas-alerts');
         if (src) src.setData({ type: 'FeatureCollection', features: [] });
@@ -938,6 +1015,60 @@ function setupCollapsiblePanels() {
       }
     });
   }
+}
+
+function returnToGlobeView() {
+  if (!focusedOnAircraft) return;
+  focusedOnAircraft = false;
+  hideTargetReticle();
+
+  if (preFocusCamera) {
+    map.flyTo({
+      center: preFocusCamera.center,
+      zoom: preFocusCamera.zoom,
+      pitch: preFocusCamera.pitch,
+      bearing: preFocusCamera.bearing,
+      duration: 2000,
+      essential: true,
+      curve: 1.2,
+    });
+    preFocusCamera = null;
+  } else {
+    map.flyTo({
+      pitch: 25,
+      bearing: 0,
+      duration: 1500,
+      essential: true,
+    });
+  }
+}
+
+const reticleEl = document.getElementById('target-reticle');
+
+function showTargetReticle(lon, lat) {
+  if (reticleEl) {
+    reticleEl.classList.remove('hidden');
+    reticleEl.classList.add('active');
+    updateReticlePosition(lon, lat);
+  }
+}
+
+function hideTargetReticle() {
+  if (reticleEl) {
+    reticleEl.classList.remove('active');
+    setTimeout(() => reticleEl.classList.add('hidden'), 500);
+  }
+}
+
+function updateReticlePosition(lon, lat) {
+  if (!reticleEl || !map) return;
+  const point = map.project([lon, lat]);
+  // Scale reticle: larger when zoomed out, smaller when zoomed in
+  const zoom = map.getZoom();
+  const size = Math.max(60, Math.min(240, 320 - zoom * 20));
+  reticleEl.style.width = size + 'px';
+  reticleEl.style.height = size + 'px';
+  reticleEl.style.transform = `translate(${point.x - size / 2}px, ${point.y - size / 2}px)`;
 }
 
 async function init() {
@@ -955,14 +1086,13 @@ async function init() {
   });
 
   initDetailPanel(
-    () => { /* panel closed */ },
+    () => { returnToGlobeView(); },
     (coords) => {
       map.easeTo({ center: coords, duration: 800 });
     }
   );
 
   initFilters(() => {
-    // Re-render when altitude filters change
     pushToMap(allAircraft);
   });
 
@@ -981,7 +1111,6 @@ async function init() {
   initIntercept(() => allAircraft);
   initAmbience();
 
-  // Register VIP hex codes for global scanning
   setVipHexes(Array.from(VIP_AIRCRAFT.keys()));
 
   map.on('load', async () => {
@@ -989,33 +1118,40 @@ async function init() {
     await setupLayers();
     console.log('[GhostTrack] Layers ready');
 
-    // Premium features — init after layers
     initTerminator(map);
     initRouteArc(map);
     initPOI(map);
     initWarzones(map);
     initLandings(map);
+    initLiveCams(map);
+    initConflictIntel(map);
     toggleWarzones(map, showWarzones);
 
     setupInteraction();
     handleFilterDisplayOptions();
     setupCollapsiblePanels();
 
-    // Theater mode — cinematic auto-tour
     initTheater(map, () => allAircraft, (ac) => {
       showPanel(ac);
       if (isCoopHost()) coopBroadcastSelection(ac.icao24);
     });
 
-    // Initial fetch
     await fetchAndUpdate();
 
-    // Dismiss loading splash
     const splash = document.getElementById('loading-splash');
     if (splash) {
       splash.classList.add('fade-out');
       setTimeout(() => splash.remove(), 1000);
     }
+
+    map.on('move', () => {
+      if (focusedOnAircraft && getSelectedIcao()) {
+        const target = allAircraft.find(a => a.icao24 === getSelectedIcao());
+        if (target && target.longitude != null) {
+          updateReticlePosition(target.longitude, target.latitude);
+        }
+      }
+    });
 
     // Re-fetch when user pans or zooms (debounced)
     let moveTimer = null;
@@ -1024,11 +1160,10 @@ async function init() {
       moveTimer = setTimeout(fetchAndUpdate, 800);
     });
 
-    // Periodic polling
     setInterval(fetchAndUpdate, FETCH_INTERVAL);
 
-    // Interpolation — near-live smooth movement (100ms tick, lightweight path)
-    setInterval(interpolationTick, 100);
+    // Interpolation — smooth movement between API fetches (250ms tick)
+    setInterval(interpolationTick, 250);
 
     // Ghost position update — slow timer, re-pushes only when ghost exists
     setInterval(() => {
@@ -1041,6 +1176,7 @@ async function init() {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && getSelectedIcao()) {
         hidePanel();
+        returnToGlobeView();
         return;
       }
       if ((e.key === '/' || (e.key === 'k' && (e.ctrlKey || e.metaKey))) && document.activeElement?.id !== 'search-input') {
