@@ -494,6 +494,17 @@ export function initConflictIntel(map) {
   setInterval(fetchGdeltEvents, 5 * 60 * 1000);
 }
 
+function extractUrlFromHtml(html) {
+  if (!html) return '';
+  const m = html.match(/href="([^"]+)"/);
+  return m ? m[1] : '';
+}
+
+function extractDomain(url) {
+  if (!url) return '';
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; }
+}
+
 async function fetchGdeltEvents() {
   try {
     const res = await fetch('/gdelt-conflict');
@@ -502,14 +513,18 @@ async function fetchGdeltEvents() {
     if (!geojson || !geojson.features) return;
     gdeltEvents = geojson.features
       .filter(f => f.geometry && f.geometry.coordinates)
-      .map(f => ({
-        lat: f.geometry.coordinates[1],
-        lon: f.geometry.coordinates[0],
-        title: (f.properties && f.properties.name) || '',
-        url: (f.properties && f.properties.url) || '',
-        domain: (f.properties && f.properties.domain) || '',
-        tone: (f.properties && f.properties.tone) || 0,
-      }));
+      .map(f => {
+        const p = f.properties || {};
+        const url = extractUrlFromHtml(p.html) || p.url || '';
+        return {
+          lat: f.geometry.coordinates[1],
+          lon: f.geometry.coordinates[0],
+          title: p.name || '',
+          url,
+          domain: extractDomain(url),
+          tone: p.tone || 0,
+        };
+      });
     const src = mapRef && mapRef.getSource('conflict-gdelt');
     if (src) src.setData(gdeltGeoJSON());
     updateGdeltFeed();

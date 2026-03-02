@@ -1117,6 +1117,20 @@ function createCamIcon(color, size = 24) {
 let playerEl = null;
 let activeCamera = null;
 
+function getDirectUrl(cam) {
+  const embed = cam.embed || '';
+  // YouTube embed → direct watch URL
+  if (embed.includes('youtube.com/embed/live_stream')) {
+    const ch = embed.match(/channel=([^&]+)/);
+    if (ch) return `https://www.youtube.com/channel/${ch[1]}/live`;
+  }
+  if (embed.includes('youtube.com/embed/')) {
+    const vid = embed.match(/embed\/([^?]+)/);
+    if (vid) return `https://www.youtube.com/watch?v=${vid[1]}`;
+  }
+  return cam.fallback || embed;
+}
+
 function openCamPlayer(cam) {
   if (!playerEl) {
     playerEl = document.getElementById('cam-player');
@@ -1130,6 +1144,7 @@ function openCamPlayer(cam) {
   const categoryEl = playerEl.querySelector('.cam-player-category');
   const iframeEl = playerEl.querySelector('.cam-player-iframe');
   const fallbackEl = playerEl.querySelector('.cam-player-fallback');
+  const directEl = playerEl.querySelector('.cam-player-direct');
 
   if (titleEl) titleEl.textContent = cam.name;
   if (locationEl) locationEl.textContent = cam.location;
@@ -1143,8 +1158,15 @@ function openCamPlayer(cam) {
     iframeEl.src = cam.embed;
   }
 
+  // Direct link — always visible for blocked embeds
+  const directUrl = getDirectUrl(cam);
+  if (directEl) {
+    directEl.href = directUrl;
+    directEl.style.display = '';
+  }
+
   if (fallbackEl) {
-    if (cam.fallback) {
+    if (cam.fallback && cam.fallback !== directUrl) {
       fallbackEl.href = cam.fallback;
       fallbackEl.style.display = '';
     } else {
