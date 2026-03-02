@@ -40,7 +40,7 @@ let fetchError = false;
 let countdownInterval = null;
 let showTrails = true;
 let showGround = true;
-let tcasEnabled = true;
+let tcasEnabled = false;
 let tcasSkip = false; // alternate: skip every other fetch cycle
 let showLandings = false;
 let showWarzones = true;
@@ -605,12 +605,20 @@ async function fetchAndUpdate() {
   }
 }
 
-// Lightweight interpolation tick — smoothly moves aircraft between API fetches.
-// Only updates point positions (skips velocity vectors, trails, HUD).
-// Runs at 250ms — balances smoothness vs. GPU churn.
-function interpolationTick() {
+// 60fps animation loop — dead-reckoning aircraft between API fetches.
+// Uses requestAnimationFrame for smooth motion. Throttles setData to ~30fps
+// to balance visual smoothness against GPU/GeoJSON parsing cost.
+let lastRenderTime = 0;
+const RENDER_INTERVAL = 33; // ~30fps cap for setData calls
+let animFrameId = null;
+
+function animationLoop(timestamp) {
+  animFrameId = requestAnimationFrame(animationLoop);
+
   if (allAircraft.length === 0) return;
-  if (document.hidden) return; // skip when tab not visible
+  if (document.hidden) return;
+  if (timestamp - lastRenderTime < RENDER_INTERVAL) return;
+  lastRenderTime = timestamp;
 
   const interpolated = getInterpolatedPositions(Date.now());
   if (interpolated.length === 0) return;
@@ -621,38 +629,41 @@ function interpolationTick() {
 
   if (combined.length > MAX_AIRCRAFT) {
     const airborne = combined.filter(a => !a.on_ground && !a.isGhost);
-    const ground = combined.filter(a => a.on_ground);
     const special = combined.filter(a => a.isGhost);
     combined = [...special, ...airborne.slice(0, MAX_AIRCRAFT - special.length)];
     if (combined.length < MAX_AIRCRAFT) {
+      const ground = combined.filter(a => a.on_ground);
       combined.push(...ground.slice(0, MAX_AIRCRAFT - combined.length));
     }
   }
 
-  // Build points-only GeoJSON (skip velocity vectors to cut feature count in half)
-  const features = combined.map(a => ({
-    type: 'Feature',
-    geometry: { type: 'Point', coordinates: [a.longitude, a.latitude] },
-    properties: {
-      icao24: a.icao24,
-      callsign: a.callsign,
-      origin_country: a.origin_country,
-      altitude_ft: a.altitude_ft,
-      speed_kts: a.speed_kts,
-      heading: Math.round(a.true_track || 0),
-      vertical_rate: a.vertical_rate,
-      vertical_rate_fpm: a.vertical_rate_fpm,
-      band: a.band,
-      color: a.color,
-      rotation: a.true_track || 0,
-      on_ground: a.on_ground ? 1 : 0,
-      isGhost: a.isGhost ? 1 : 0,
-      registration: a.registration || '',
-      aircraft_type: a.aircraft_type || '',
-      squawk: a.squawk || '',
-      dbFlags: a.dbFlags || 0,
-    },
-  }));
+  const features = [];
+  for (let i = 0; i < combined.length; i++) {
+    const a = combined[i];
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [a.longitude, a.latitude] },
+      properties: {
+        icao24: a.icao24,
+        callsign: a.callsign,
+        origin_country: a.origin_country,
+        altitude_ft: a.altitude_ft,
+        speed_kts: a.speed_kts,
+        heading: Math.round(a.true_track || 0),
+        vertical_rate: a.vertical_rate,
+        vertical_rate_fpm: a.vertical_rate_fpm,
+        band: a.band,
+        color: a.color,
+        rotation: a.true_track || 0,
+        on_ground: a.on_ground ? 1 : 0,
+        isGhost: a.isGhost ? 1 : 0,
+        registration: a.registration || '',
+        aircraft_type: a.aircraft_type || '',
+        squawk: a.squawk || '',
+        dbFlags: a.dbFlags || 0,
+      },
+    });
+  }
 
   const source = map.getSource('aircraft');
   if (source) {
@@ -663,7 +674,7 @@ function interpolationTick() {
   if (selectedIcao && isFollowing()) {
     const selected = combined.find(a => a.icao24 === selectedIcao);
     if (selected && selected.longitude != null) {
-      map.easeTo({ center: [selected.longitude, selected.latitude], duration: 250 });
+      map.easeTo({ center: [selected.longitude, selected.latitude], duration: 80 });
     }
   }
 
@@ -1162,8 +1173,8 @@ async function init() {
 
     setInterval(fetchAndUpdate, FETCH_INTERVAL);
 
-    // Interpolation — smooth movement between API fetches (250ms tick)
-    setInterval(interpolationTick, 250);
+    // 60fps dead-reckoning animation loop
+    animFrameId = requestAnimationFrame(animationLoop);
 
     // Ghost position update — slow timer, re-pushes only when ghost exists
     setInterval(() => {

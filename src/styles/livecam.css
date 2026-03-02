@@ -159,17 +159,30 @@
   padding: 6px 10px 8px;
 }
 
+.cam-player-direct,
 .cam-player-fallback {
   display: inline-block;
   font-size: 8px;
   letter-spacing: 2px;
-  color: rgba(0, 255, 136, 0.5);
   text-decoration: none;
   padding: 3px 8px;
-  border: 1px solid rgba(0, 255, 136, 0.15);
   border-radius: 2px;
   margin-bottom: 6px;
+  margin-right: 6px;
   transition: all 0.15s;
+}
+.cam-player-direct {
+  color: rgba(0, 206, 209, 0.7);
+  border: 1px solid rgba(0, 206, 209, 0.25);
+}
+.cam-player-direct:hover {
+  color: #00CED1;
+  border-color: rgba(0, 206, 209, 0.5);
+  background: rgba(0, 206, 209, 0.08);
+}
+.cam-player-fallback {
+  color: rgba(0, 255, 136, 0.5);
+  border: 1px solid rgba(0, 255, 136, 0.15);
 }
 .cam-player-fallback:hover {
   color: #00ff88;

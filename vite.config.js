@@ -242,8 +242,8 @@ function gdeltConflictPlugin() {
         }
 
         const url = 'https://api.gdeltproject.org/api/v2/geo/geo?' +
-          'query=(Iran+OR+Israel+OR+"Epic Fury"+OR+"Roaring Lion"+OR+Hormuz)+theme:CONFLICT&' +
-          'mode=PointData&format=GeoJSON&timespan=24h';
+          'query=(Iran+OR+Israel+OR+"Epic Fury"+OR+"Roaring Lion"+OR+Hormuz)&' +
+          'mode=PointData&format=GeoJSON&timespan=24h&maxpoints=75';
 
         https.get(url, (gdeltRes) => {
           let body = '';
