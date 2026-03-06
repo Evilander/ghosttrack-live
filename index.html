@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GhostTrack Live — Global Flight Intelligence</title>
+  <meta name="description" content="Real-time global ADS-B flight tracking with military-grade tactical telemetry interface" />
+  <meta name="theme-color" content="#02060d" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Vignette Overlay -->
+  <div id="vignette"></div>
+
+  <!-- CRT Scanlines Overlay -->
+  <div id="scanlines"></div>
+
+  <!-- Radar Sweep -->
+  <div id="radar-sweep"></div>
+
+  <!-- Targeting Reticle (shown on aircraft focus) -->
+  <div id="target-reticle" class="target-reticle hidden">
+    <div class="reticle-ring reticle-ring-outer"></div>
+    <div class="reticle-ring reticle-ring-inner"></div>
+    <div class="reticle-crosshair reticle-h"></div>
+    <div class="reticle-crosshair reticle-v"></div>
+    <div class="reticle-corner rc-tl"></div>
+    <div class="reticle-corner rc-tr"></div>
+    <div class="reticle-corner rc-bl"></div>
+    <div class="reticle-corner rc-br"></div>
+    <div class="reticle-label">TARGET LOCK</div>
+  </div>
+
+  <!-- Classification Banner -->
+  <div id="classification-banner" class="classification-banner">
+    <span class="classification-text">UNCLASSIFIED // FOUO</span>
+  </div>
+  <div id="classification-banner-bottom" class="classification-banner classification-bottom">
+    <span class="classification-text">SYSTEM: GHOSTTRACK // SIGINT FEED ACTIVE // IRAN THEATER: EPIC FURY / ROARING LION // NO FORN</span>
+  </div>
+
+  <!-- HUD Top Left -->
+  <div id="hud-top-left" class="hud">
+    <div class="hud-brand">GHOSTTRACK<span class="hud-brand-dim"> LIVE</span> <span class="hud-version">v2.1</span></div>
+    <div class="hud-classification-tag">OPERATIONAL</div>
+    <div class="hud-divider"></div>
+    <div class="hud-row">
+      <span id="heartbeat" class="heartbeat"></span>
+      <span id="aircraft-count">0</span>
+      <span class="hud-label">TRACKED</span>
+    </div>
+    <div class="hud-row hud-row-sub">
+      <span id="airborne-count">0</span>
+      <span class="hud-label">AIRBORNE</span>
+      <span class="hud-sep">|</span>
+      <span id="ground-count">0</span>
+      <span class="hud-label">GROUND</span>
+    </div>
+    <div class="hud-divider"></div>
+    <div class="hud-row hud-row-sub">
+      <span class="hud-label">FEED</span>
+      <span id="data-age" class="data-age-indicator">0s</span>
+      <span class="hud-sep">|</span>
+      <span class="hud-label">SIGINT</span>
+      <span class="sigint-status">ACTIVE</span>
+    </div>
+  </div>
+
+  <!-- HUD Top Right -->
+  <div id="hud-top-right" class="hud">
+    <div class="hud-row">
+      <span class="hud-label">UTC</span>
+      <span id="utc-clock" class="clock-value">00:00:00</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">LOCAL</span>
+      <span id="local-clock" class="clock-value">00:00:00</span>
+    </div>
+    <div class="hud-divider"></div>
+    <div class="hud-row">
+      <span class="hud-label">LAT</span>
+      <span id="cursor-lat" class="clock-value">---.----</span>
+    </div>
+    <div class="hud-row">
+      <span class="hud-label">LON</span>
+      <span id="cursor-lon" class="clock-value">---.----</span>
+    </div>
+  </div>
+
+  <!-- Search Bar -->
+  <div id="search-bar" class="search-bar">
+    <span class="search-icon">⌕</span>
+    <input id="search-input" type="text" placeholder="SEARCH CALLSIGN... (press /)" autocomplete="off" spellcheck="false" />
+    <div id="search-results" class="search-results hidden"></div>
+  </div>
+
+  <!-- Unit Toggle -->
+  <div id="unit-toggle" class="hud unit-toggle">
+    <button id="unit-btn" class="unit-btn" title="Toggle units">
+      <span id="unit-label">AVIATION</span>
+      <span class="unit-indicator" id="unit-indicator">KTS / FT</span>
+    </button>
+  </div>
+
+  <!-- Altitude Legend -->
+  <div id="altitude-legend" class="hud">
+    <div class="legend-title">ALTITUDE</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#FFA500"></span><span class="legend-text">0 – 10,000 ft</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:#00CED1"></span><span class="legend-text">10k – 25,000 ft</span></div>
+    <div class="legend-item"><span class="legend-dot" style="background:#E0F0FF"></span><span class="legend-text">25,000+ ft</span></div>
+  </div>
+
+  <!-- Top Origins Ticker -->
+  <div id="stats-ticker" class="hud stats-ticker">
+    <div class="legend-title">TOP ORIGINS</div>
+    <div id="top-origins"></div>
+  </div>
+
+  <!-- Top Flight Stats (top bar, left of search) -->
+  <div id="top-flight-stats" class="hud collapsible collapsed top-flight-stats">
+    <div class="top-flight-header collapse-header" data-target="top-flight-body">
+      <span class="collapse-arrow">&#9660;</span>
+      <span class="top-flight-title">LEADERBOARD</span>
+      <span id="stat-ticker" class="stat-ticker"></span>
+    </div>
+    <div id="top-flight-body" class="top-flight-body collapse-body">
+      <div class="top-flight-row clickable" id="stat-row-fastest">
+        <span class="top-flight-icon">&#9889;</span>
+        <span class="top-flight-label">FASTEST</span>
+        <span id="stat-fastest" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row clickable" id="stat-row-highest">
+        <span class="top-flight-icon">&#9650;</span>
+        <span class="top-flight-label">HIGHEST</span>
+        <span id="stat-highest" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row clickable" id="stat-row-clements">
+        <span class="top-flight-icon">&#9733;</span>
+        <span class="top-flight-label">TOP MIL</span>
+        <span class="tcas-help top-flight-help" data-tooltip="Brandon Clements Approved — fastest military craft in the sky right now.">?</span>
+        <span id="stat-clements" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row clickable" id="stat-row-deepdive">
+        <span class="top-flight-icon">&#9660;</span>
+        <span class="top-flight-label">DEEP DIVE</span>
+        <span id="stat-deepdive" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row clickable" id="stat-row-rocketship">
+        <span class="top-flight-icon">&#9651;</span>
+        <span class="top-flight-label">ROCKETSHIP</span>
+        <span id="stat-rocketship" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-row clickable" id="stat-row-slowpoke">
+        <span class="top-flight-icon">&#128034;</span>
+        <span class="top-flight-label">SLOWPOKE</span>
+        <span id="stat-slowpoke" class="top-flight-value">---</span>
+      </div>
+      <div class="top-flight-divider"></div>
+      <div class="top-flight-row">
+        <span class="top-flight-label">MILITARY</span>
+        <span id="stat-mil-count" class="top-flight-count">0</span>
+      </div>
+      <div class="top-flight-row">
+        <span class="top-flight-label">VIP JETS</span>
+        <span id="stat-vip-count" class="top-flight-count">0</span>
+      </div>
+      <div class="top-flight-row">
+        <span class="top-flight-label">PRIVATE</span>
+        <span id="stat-pvt-count" class="top-flight-count">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div id="detail-panel" class="detail-panel hidden">
+    <button id="detail-close" class="detail-close">&times;</button>
+    <div class="detail-header">
+      <span id="detail-callsign" class="detail-callsign">---</span>
+      <span id="detail-status" class="detail-status"></span>
+    </div>
+    <!-- Special badges (VIP / Military / Emergency) -->
+    <div id="detail-badges" class="detail-badges" style="display:none"></div>
+
+    <div class="detail-grid">
+      <div class="detail-cell full-width" id="detail-route-cell" style="display:none">
+        <div class="detail-label">ROUTE</div>
+        <div id="detail-route" class="detail-value highlight">---</div>
+      </div>
+      <div class="detail-cell" id="detail-airline-cell" style="display:none">
+        <div class="detail-label">AIRLINE</div>
+        <div id="detail-airline" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell" id="detail-aircraft-cell" style="display:none">
+        <div class="detail-label">AIRCRAFT</div>
+        <div id="detail-aircraft" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">ORIGIN</div>
+        <div id="detail-origin" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">ALTITUDE</div>
+        <div id="detail-altitude" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">GROUND SPEED</div>
+        <div id="detail-speed" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">HEADING</div>
+        <div id="detail-heading" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">VERTICAL RATE</div>
+        <div id="detail-vrate" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">SQUAWK</div>
+        <div id="detail-squawk" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">ICAO24</div>
+        <div id="detail-icao" class="detail-value">---</div>
+      </div>
+      <div class="detail-cell" id="detail-category-cell" style="display:none">
+        <div class="detail-label">CATEGORY</div>
+        <div id="detail-category" class="detail-value">---</div>
+      </div>
+    </div>
+
+    <!-- Aircraft Photo -->
+    <div id="detail-photo-container" class="detail-photo-container" style="display:none">
+      <div class="detail-section-title">AIRCRAFT PHOTO</div>
+      <img id="detail-photo" class="detail-photo" alt="Aircraft" />
+      <div id="detail-photo-credit" class="detail-photo-credit"></div>
+    </div>
+
+    <!-- Satellite Ground View -->
+    <div class="detail-section-title">GROUND VIEW</div>
+    <div id="satellite-view" class="satellite-view">
+      <div id="satellite-map"></div>
+      <div id="satellite-label" class="satellite-label">Loading terrain...</div>
+    </div>
+    <div class="detail-actions">
+      <button id="btn-google-earth" class="detail-action-btn">OPEN IN GOOGLE EARTH</button>
+      <button id="btn-follow" class="detail-action-btn detail-action-btn-alt">FOLLOW AIRCRAFT</button>
+      <button id="btn-isolate" class="detail-action-btn detail-action-btn-alt">ISOLATE</button>
+    </div>
+
+    <!-- ATC Live Audio -->
+    <div id="atc-section" class="atc-section" style="display:none">
+      <div class="detail-section-title">LIVE ATC AUDIO</div>
+      <div class="atc-player">
+        <div id="atc-airport-tabs" class="atc-airport-tabs"></div>
+        <div id="atc-feeds" class="atc-feeds"></div>
+        <div class="atc-visualizer-row">
+          <canvas id="atc-visualizer" class="atc-visualizer" width="340" height="60"></canvas>
+        </div>
+        <div class="atc-now-playing">
+          <span id="atc-status-text" class="atc-status-text">SELECT AIRPORT</span>
+        </div>
+        <div class="atc-volume-row">
+          <span class="atc-vol-icon">&#9835;</span>
+          <input type="range" id="atc-volume" class="atc-volume" min="0" max="100" value="70" />
+        </div>
+        <audio id="atc-audio" preload="none" crossorigin="anonymous"></audio>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hover Tooltip -->
+  <div id="hover-tooltip" class="hover-tooltip hidden">
+    <div id="tooltip-callsign" class="tooltip-callsign"></div>
+    <div id="tooltip-info" class="tooltip-info"></div>
+  </div>
+
+  <!-- Emergency Alert Banner -->
+  <div id="emergency-alert" class="emergency-alert hidden">
+    <div class="emergency-alert-icon">&#9888;</div>
+    <div class="emergency-alert-body">
+      <div id="emergency-alert-title" class="emergency-alert-title">EMERGENCY</div>
+      <div id="emergency-alert-detail" class="emergency-alert-detail"></div>
+    </div>
+    <button id="emergency-alert-close" class="emergency-alert-close">&times;</button>
+  </div>
+
+  <!-- Signal Lost Overlay -->
+  <div id="signal-lost" class="signal-lost hidden">
+    <div class="signal-lost-content">
+      <div class="signal-lost-icon">⚠</div>
+      <div class="signal-lost-title">SIGNAL LOST</div>
+      <div id="signal-lost-message" class="signal-lost-message">Connection interrupted</div>
+      <div class="signal-lost-retry">Retrying in <span id="signal-lost-countdown">--</span>s</div>
+    </div>
+  </div>
+
+  <!-- Conflict Intelligence Briefing Button -->
+  <button id="conflict-briefing-btn" class="conflict-briefing-btn" title="Open conflict briefing">&#9888; EPIC FURY BRIEFING</button>
+
+  <!-- Conflict Intelligence Panel -->
+  <div id="conflict-panel" class="conflict-panel hidden">
+    <div class="conflict-panel-header">
+      <div class="conflict-panel-meta">
+        <span class="conflict-panel-tag">&#9888; ACTIVE CONFLICT</span>
+        <span class="conflict-panel-title">IRAN THEATER BRIEFING</span>
+        <span class="conflict-panel-subtitle">Feb 28 – present · 9 countries affected</span>
+      </div>
+      <button id="conflict-panel-close" class="conflict-panel-close">&times;</button>
+    </div>
+
+    <div class="conflict-ops-names">
+      <span class="conflict-op-badge israel">ISRAEL: ROARING LION</span>
+      <span class="conflict-op-badge us">US: EPIC FURY</span>
+    </div>
+
+    <div class="conflict-section">
+      <div class="conflict-section-title">STRAIT OF HORMUZ</div>
+      <div class="conflict-hormuz-stat">
+        <div class="conflict-hormuz-indicator"></div>
+        <span class="conflict-hormuz-text">DE FACTO BLOCKADE — 150+ TANKERS ANCHORED</span>
+      </div>
+      <div style="font-size:11px;color:rgba(224,240,255,0.75);line-height:1.6;">
+        20-30% of global oil/gas flows through this strait. Maersk, Hapag-Lloyd, CMA CGM, MSC suspended transits. Tanker "Skylight" struck near Khasab, Oman.
+      </div>
+      <button id="conflict-fly-to" class="conflict-fly-btn">FLY TO THEATER</button>
+    </div>
+
+    <div class="conflict-section">
+      <div class="conflict-section-title">CASUALTY SUMMARY</div>
+      <div id="conflict-casualties"></div>
+    </div>
+
+    <div class="conflict-section">
+      <div class="conflict-section-title">DISPUTED / UNVERIFIED CLAIMS</div>
+      <div id="conflict-claims"></div>
+    </div>
+
+    <div class="conflict-section">
+      <div class="conflict-section-title">GDELT REAL-TIME INTEL FEED</div>
+      <div id="conflict-gdelt-feed" style="max-height:180px;overflow-y:auto;">
+        <div style="font-size:10px;color:rgba(224,240,255,0.5);">Loading GDELT data...</div>
+      </div>
+    </div>
+
+    <div class="conflict-source-note">
+      Data sources: AJLabs casualty tracker, CENTCOM, Al Jazeera, Israel-Alma, CBS News, Newsweek, NPR, Washington Post, GDELT Project. All figures are preliminary. "Verified" = confirmed by satellite imagery or multiple independent sources. "Claimed" = single-source, not independently confirmed.
+    </div>
+  </div>
+
+  <!-- Live Cam Player Panel -->
+  <div id="cam-player" class="cam-player hidden">
+    <div class="cam-player-header">
+      <div class="cam-player-meta">
+        <span class="cam-player-category">URBAN</span>
+        <span class="cam-player-title">---</span>
+        <span class="cam-player-location">---</span>
+      </div>
+      <button id="cam-player-close" class="cam-player-close">&times;</button>
+    </div>
+    <div class="cam-player-viewport">
+      <iframe class="cam-player-iframe" src="about:blank" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" referrerpolicy="no-referrer"></iframe>
+      <div class="cam-player-blocked" style="display:none"></div>
+    </div>
+    <div class="cam-player-footer">
+      <a class="cam-player-direct" href="#" target="_blank" rel="noopener">OPEN DIRECT &#8599;</a>
+      <a class="cam-player-fallback" href="#" target="_blank" rel="noopener" style="display:none">ALT SOURCE</a>
+      <div class="cam-player-nav">
+        <div id="cam-player-list" class="cam-player-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left-side tracker stack (watchlist + TCAS) -->
+  <div id="tracker-stack" class="tracker-stack">
+    <!-- Anomaly Tracker -->
+    <div id="anomaly-tracker" class="anomaly-tracker hud collapsible collapsed">
+      <div class="anomaly-header collapse-header" data-target="anomaly-list">
+        <span class="collapse-arrow">&#9660;</span>
+        <span class="anomaly-title">WATCHLIST</span>
+        <span id="anomaly-count" class="anomaly-count">0</span>
+      </div>
+      <div id="anomaly-list" class="anomaly-list collapse-body"></div>
+    </div>
+
+    <!-- TCAS Proximity Panel -->
+    <div id="tcas-tracker" class="tcas-tracker hud collapsible">
+      <div class="tcas-header collapse-header" data-target="tcas-list">
+        <span class="collapse-arrow">&#9660;</span>
+        <span class="tcas-title">TCAS</span>
+        <span class="tcas-help" data-tooltip="Traffic Collision Avoidance System — detects aircraft pairs that are dangerously close. TA (Traffic Advisory): &lt;5nm &amp; &lt;1000ft separation. RA (Resolution Advisory): &lt;2nm &amp; &lt;500ft separation.">?</span>
+        <label class="tcas-toggle-label" title="Enable/disable TCAS detection"><input type="checkbox" id="tcas-enabled" /><span class="tcas-toggle-text">OFF</span></label>
+        <span id="tcas-count" class="tcas-count">0</span>
+      </div>
+      <div id="tcas-list" class="tcas-list collapse-body"></div>
+    </div>
+  </div>
+
+  <!-- Theater + Intercept Buttons -->
+  <div id="mode-buttons" class="mode-buttons">
+    <button id="theater-toggle" class="theater-toggle">THEATER</button>
+    <button id="intercept-toggle" class="intercept-toggle">INTERCEPT</button>
+  </div>
+  <div id="intercept-panel" class="intercept-panel hidden">
+    <div id="intercept-mission" class="intercept-mission">STANDBY</div>
+    <div class="intercept-timer-track">
+      <div id="intercept-timer-bar" class="intercept-timer-bar"></div>
+    </div>
+    <div class="intercept-stats">
+      <div class="intercept-stat">
+        <span class="intercept-stat-label">SCORE</span>
+        <span id="intercept-score" class="intercept-score">0</span>
+      </div>
+      <div class="intercept-stat">
+        <span class="intercept-stat-label">STREAK</span>
+        <span id="intercept-streak" class="intercept-streak">×1</span>
+      </div>
+    </div>
+  </div>
+  <div id="intercept-result" class="intercept-result hidden"></div>
+
+  <!-- Filter Panel -->
+  <div id="filter-panel" class="filter-panel">
+    <button id="filter-toggle" class="filter-toggle">▲ FILTERS</button>
+    <div id="filter-body" class="filter-body hidden">
+      <div class="filter-section">
+        <div class="filter-title">ALTITUDE BANDS</div>
+        <label class="filter-check"><input type="checkbox" data-filter="low" checked /><span class="filter-dot" style="background:#FFA500"></span> Ground – 10,000 ft</label>
+        <label class="filter-check"><input type="checkbox" data-filter="mid" checked /><span class="filter-dot" style="background:#00CED1"></span> 10,000 – 25,000 ft</label>
+        <label class="filter-check"><input type="checkbox" data-filter="high" checked /><span class="filter-dot" style="background:#E0F0FF"></span> 25,000+ ft</label>
+      </div>
+      <div class="filter-section">
+        <div class="filter-title">DISPLAY</div>
+        <label class="filter-check"><input type="checkbox" id="filter-ground" checked /> Show ground traffic</label>
+        <label class="filter-check"><input type="checkbox" id="filter-trails" checked /> Show trails</label>
+        <label class="filter-check"><input type="checkbox" id="filter-terminator" checked /> Show day/night</label>
+        <label class="filter-check"><input type="checkbox" id="filter-poi" checked /> Show points of interest</label>
+        <label class="filter-check"><input type="checkbox" id="filter-landings" /> Show VIP/PVT last landings</label>
+        <label class="filter-check"><input type="checkbox" id="filter-warzones" checked /> Show warzones</label>
+        <label class="filter-check"><input type="checkbox" id="filter-livecams" checked /> Show live cams</label>
+        <label class="filter-check"><input type="checkbox" id="filter-conflict" checked /><span class="filter-dot" style="background:#ff4444"></span> Conflict intel</label>
+        <label class="filter-check"><input type="checkbox" id="filter-watchlist" checked /> Show watchlist panel</label>
+      </div>
+      <div class="filter-section">
+        <div class="filter-title">CO-OP</div>
+        <label class="filter-check"><input type="checkbox" id="filter-coop" /> Enable co-op (host)</label>
+        <label class="filter-check"><input type="checkbox" id="filter-coop-follow" /> Join as follower</label>
+        <button id="coop-copy-link" class="filter-btn" type="button" disabled>COPY FOLLOW LINK</button>
+        <div id="coop-status" class="filter-hint">OFF</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ambient Soundscape Toggle -->
+  <div id="ambience-controls" class="ambience-controls">
+    <button id="ambience-toggle" class="ambience-toggle" title="Toggle ambient radar soundscape">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+      </svg>
+    </button>
+    <div class="ambience-slider-wrap">
+      <input type="range" id="ambience-volume" class="ambience-volume" min="0" max="100" value="50" />
+    </div>
+  </div>
+
+  <div class="creator-watermark">created by Evilander</div>
+
+  <!-- Intel Ticker -->
+  <div id="intel-ticker" class="intel-ticker">
+    <div class="intel-ticker-content">
+      <span class="intel-ticker-item">GLOBAL SURVEILLANCE NETWORK ONLINE</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">ADS-B FEEDS NOMINAL</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">THREAT ASSESSMENT: ELEVATED — EPIC FURY / ROARING LION ACTIVE</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">SIGINT CHANNELS ACTIVE</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">TCAS MONITORING ENABLED</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">VIP TRACKING OPERATIONAL</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">GLOBAL SURVEILLANCE NETWORK ONLINE</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">ADS-B FEEDS NOMINAL</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">THREAT ASSESSMENT: ELEVATED — EPIC FURY / ROARING LION ACTIVE</span>
+      <span class="intel-ticker-sep">//</span>
+      <span class="intel-ticker-item">SIGINT CHANNELS ACTIVE</span>
+    </div>
+  </div>
+
+  <!-- Loading Splash — Boot Sequence -->
+  <div id="loading-splash" class="loading-splash">
+    <div class="loading-content">
+      <div class="loading-classification">TOP SECRET // SI // NOFORN</div>
+      <div class="loading-brand">GHOSTTRACK<span class="loading-brand-dim"> LIVE</span></div>
+      <div class="loading-sub">GLOBAL FLIGHT INTELLIGENCE PLATFORM</div>
+      <div class="loading-sub loading-sub-small">DEFENSE INTELLIGENCE NETWORK — SECTOR 7</div>
+      <div class="loading-bar-track">
+        <div class="loading-bar"></div>
+      </div>
+      <div class="loading-boot-log">
+        <div class="boot-line" style="animation-delay:0.2s">[SYS] Initializing secure uplink...</div>
+        <div class="boot-line" style="animation-delay:0.6s">[NET] ADS-B receiver mesh connected</div>
+        <div class="boot-line" style="animation-delay:1.0s">[INT] SIGINT feed authenticated</div>
+        <div class="boot-line" style="animation-delay:1.4s">[MAP] Geospatial engine loaded</div>
+        <div class="boot-line" style="animation-delay:1.8s">[OPS] Threat detection online</div>
+        <div class="boot-line" style="animation-delay:2.0s">[INTEL] Iran theater — EPIC FURY / ROARING LION active</div>
+      </div>
+      <div class="loading-status">ESTABLISHING TELEMETRY LINK...</div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

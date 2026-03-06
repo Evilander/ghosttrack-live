@@ -1,0 +1,179 @@
+// Warzones overlay.
+//
+// "Authoritative" mode requires UN/OCHA data access that is currently gated behind
+// an approved app identifier for OCHA APIs (ReliefWeb / HDX HAPI).
+// When not configured/available, this falls back to a small approximate overlay.
+//
+// Country boundaries are sourced from Natural Earth (public domain) and used only
+// to render country-level highlighting when OCHA provides a country list.
+
+const FALLBACK_WARZONE_AREAS = [
+  {
+    name: 'Ukraine',
+    key: 'ukraine',
+    desc: 'Russo-Ukrainian War. Full-scale invasion since Feb 2022. Active frontlines across eastern and southern Ukraine. Heavy drone, missile, and artillery warfare. Airspace closed to civil aviation.',
+    polygon: [
+      [22.0, 52.5],
+      [40.5, 52.5],
+      [40.5, 44.0],
+      [22.0, 44.0],
+      [22.0, 52.5],
+    ],
+  },
+  {
+    name: 'Gaza / Israel',
+    key: 'gaza_israel',
+    desc: 'Israel-Hamas conflict. Ongoing military operations in Gaza since Oct 2023. Now expanded: Operation Roaring Lion strikes on Iran (Feb 28, 2026). Iranian retaliation hit Israel with 11+ killed, ~500 wounded.',
+    polygon: [
+      [34.0, 32.2],
+      [35.9, 32.2],
+      [35.9, 30.8],
+      [34.0, 30.8],
+      [34.0, 32.2],
+    ],
+  },
+  {
+    name: 'Iran — Epic Fury / Roaring Lion',
+    key: 'iran_epicfury',
+    desc: 'Active US-Israel joint military operations since Feb 28, 2026. Op EPIC FURY (US) / ROARING LION (Israel). Supreme Leader Khamenei killed in initial strikes. Multi-phase campaign across 24+ provinces targeting nuclear, missile, and C2 infrastructure. Iranian retaliation hit Israel (11+ killed, 500+ wounded) and bases across 9 countries. Strait of Hormuz under de facto blockade (150+ tankers anchored). Ongoing as of Mar 2026.',
+    polygon: [
+      [44.0, 40.0],
+      [63.5, 40.0],
+      [63.5, 25.0],
+      [44.0, 25.0],
+      [44.0, 40.0],
+    ],
+  },
+  {
+    name: 'Sudan',
+    key: 'sudan',
+    desc: 'Sudanese civil war. Conflict between SAF and RSF since Apr 2023. Widespread fighting in Khartoum, Darfur, and Kordofan. Millions displaced. Airports largely non-operational.',
+    polygon: [
+      [21.5, 22.5],
+      [38.5, 22.5],
+      [38.5, 8.0],
+      [21.5, 8.0],
+      [21.5, 22.5],
+    ],
+  },
+  {
+    name: 'Myanmar',
+    key: 'myanmar',
+    desc: 'Myanmar civil war. Armed resistance against military junta since 2021 coup. Multi-front conflict with ethnic armed groups and resistance forces. Airstrikes on civilian areas.',
+    polygon: [
+      [92.0, 28.6],
+      [101.5, 28.6],
+      [101.5, 9.5],
+      [92.0, 9.5],
+      [92.0, 28.6],
+    ],
+  },
+];
+
+function fallbackGeoJSON() {
+  return {
+    type: 'FeatureCollection',
+    features: FALLBACK_WARZONE_AREAS.map((a) => ({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [a.polygon] },
+      properties: {
+        name: a.name,
+        key: a.key,
+        desc: a.desc || '',
+      },
+    })),
+  };
+}
+
+export function initWarzones(map) {
+  map.addSource('warzones', {
+    type: 'geojson',
+    data: fallbackGeoJSON(),
+  });
+
+  map.addLayer({
+    id: 'warzones-fill',
+    type: 'fill',
+    source: 'warzones',
+    paint: {
+      'fill-color': 'rgba(255, 68, 68, 0.12)',
+      'fill-outline-color': 'rgba(255, 68, 68, 0.35)',
+    },
+  }, 'trail-lines');
+
+  map.addLayer({
+    id: 'warzones-labels',
+    type: 'symbol',
+    source: 'warzones',
+    minzoom: 3,
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-size': 10,
+      'text-font': ['Noto Sans Regular'],
+      'text-optional': true,
+    },
+    paint: {
+      'text-color': 'rgba(255, 68, 68, 0.7)',
+      'text-halo-color': 'rgba(10, 14, 23, 0.9)',
+      'text-halo-width': 1.5,
+    },
+  }, 'trail-lines');
+
+  // Try to replace fallback overlay with OCHA-driven country highlighting.
+  // Non-fatal: failures keep the fallback.
+  refreshWarzones(map);
+}
+
+export function toggleWarzones(map, visible) {
+  const vis = visible ? 'visible' : 'none';
+  if (map.getLayer('warzones-fill')) map.setLayoutProperty('warzones-fill', 'visibility', vis);
+  if (map.getLayer('warzones-labels')) map.setLayoutProperty('warzones-labels', 'visibility', vis);
+}
+
+async function loadWorldCountries() {
+  const res = await fetch('/ne_110m_admin_0_countries.geojson', { cache: 'force-cache' });
+  if (!res.ok) throw new Error('world boundaries unavailable');
+  return await res.json();
+}
+
+async function fetchOchaWarCountries() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch('/ocha-war-countries', { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json || !json.authoritative || !Array.isArray(json.iso3) || json.iso3.length === 0) return null;
+    return json;
+  } catch {
+    clearTimeout(timeout);
+    return null;
+  }
+}
+
+async function refreshWarzones(map) {
+  const info = await fetchOchaWarCountries();
+  if (!info) return;
+
+  const world = await loadWorldCountries();
+  const set = new Set(info.iso3.map((s) => String(s).toUpperCase()));
+
+  const features = (world.features || []).filter((f) => {
+    const p = f && f.properties ? f.properties : {};
+    const iso3 = (p.ISO_A3 || p.ADM0_A3 || '').toUpperCase();
+    return iso3 && set.has(iso3);
+  }).map((f) => ({
+    type: 'Feature',
+    geometry: f.geometry,
+    properties: {
+      name: `Conflict (UN/OCHA): ${f.properties.ADMIN || f.properties.NAME || f.properties.ADM0_A3 || 'Country'}`,
+      key: (f.properties.ISO_A3 || f.properties.ADM0_A3 || '').toUpperCase(),
+    },
+  }));
+
+  if (features.length === 0) return;
+
+  const src = map.getSource('warzones');
+  if (src) src.setData({ type: 'FeatureCollection', features });
+}
