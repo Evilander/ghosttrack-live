@@ -1,15 +1,15 @@
 // Ghost aircraft easter eggs
 // One ghost hovers above the user's current location
-// One ghost hovers above Quincy, IL
+// One ghost orbits a fixed Midwest anchor point
 
 const SPAWN_DELAY_MIN = 30000;  // 30s
 const SPAWN_DELAY_MAX = 90000;  // 90s
 const ORBIT_RADIUS_DEG = 0.02;  // ~2km radius orbit
 const ORBIT_SPEED = 0.0003;     // radians per update tick
 
-// Static ghost anchor: Quincy, IL
-const STATIC_GHOST_LAT = 39.9340;
-const STATIC_GHOST_LON = -91.4099;
+// Static ghost anchor: central Illinois
+const STATIC_GHOST_LAT = 39.7817;
+const STATIC_GHOST_LON = -89.6501;
 
 let ghostAircraft = null;
 let staticGhostAircraft = null;
