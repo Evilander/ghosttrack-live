@@ -1,6 +1,7 @@
 {
   "name": "ghosttrack-live",
   "version": "2.1.0",
+  "license": "MIT",
   "description": "",
   "type": "module",
   "scripts": {
